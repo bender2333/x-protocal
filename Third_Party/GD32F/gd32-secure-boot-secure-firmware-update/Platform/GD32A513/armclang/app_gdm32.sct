@@ -1,0 +1,17 @@
+#! armclang --target=arm-arm-none-eabi -march=armv8-m.main -E -xc -I ../../../config -I ../../../../Platform/GD32G5x3/armclang -I ../../APP
+
+
+#include "../../APP/app_region.h"
+
+LR_IROM1 APP_CODE_START APP_CODE_SIZE  {    ; load region size_region
+  ER_IROM1 APP_CODE_START APP_CODE_SIZE  {  ; load address = execution address
+   *.o (RESET, +First)
+   *(InRoot$$Sections)
+   .ANY (+RO)
+   .ANY (+XO)
+  }
+  RW_IRAM1  APP_DATA_START APP_DATA_SIZE  {  ; RW data
+   .ANY (+RW +ZI)
+  }
+
+}

@@ -1,0 +1,69 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: ¦ÌVision V5.43.0.0
+Copyright (C) 2025 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: A A, A, LIC=X96CK-ZLFF9-56QQ2-9Y4FI-TJ5CB-8T6E8
+ 
+Tool Versions:
+Toolchain:       MDK-ARM Plus  Version: 5.43.0.0
+Toolchain Path:  C:\Users\xjl\AppData\Local\Keil_v5\ARM\ARMCLANG\Bin
+C Compiler:      ArmClang.exe V6.24
+Assembler:       Armasm.exe V6.24
+Linker/Locator:  ArmLink.exe V6.24
+Library Manager: ArmAr.exe V6.24
+Hex Converter:   FromElf.exe V6.24
+CPU DLL:         
+Dialog DLL:      
+Target DLL:      Segger\JL2CM3.dll V2.99.45.0
+Dialog DLL:      TCM.DLL V1.56.6.0
+ 
+<h2>Project:</h2>
+D:\XC8064\0818-\XC8064\gd32-secure-boot-secure-firmware-update\Project\GD32F5xx\MDK-ARM\MBL\Project_MBL.uvprojx
+Project File Date:  08/19/2025
+
+<h2>Output:</h2>
+*** Using Compiler 'V6.24', folder: 'C:\Users\xjl\AppData\Local\Keil_v5\ARM\ARMCLANG\Bin'
+Build Project 'Project_MBL' - Target 'Target_GDM32'
+compiling swap_scratch.c...
+compiling encrypted.c...
+compiling tlv.c...
+compiling flash_map.c...
+compiling swap_move.c...
+compiling mbl.c...
+compiling image_validate.c...
+compiling bootutil_misc.c...
+compiling swap_misc.c...
+compiling image_rsa.c...
+compiling bootutil_public.c...
+compiling loader.c...
+linking...
+Program Size: Code=21574 RO-data=4106 RW-data=1224 ZI-data=49176  
+FromELF: creating hex file...
+After Build - User command #2: python ..\..\..\afterbuild.py project_deal -pn MBL -op D:\XC8064\0818-\XC8064\gd32-secure-boot-secure-firmware-update\Project\GD32F5xx\MDK-ARM\MBL\mbl\Objects\ -on mbl  -ide KEIL -ip C:\Users\xjl\AppData\Local\Keil_v5\
+sig type is:  PKCS1_PSS_RSA2048_SHA256
+pub key is: 9c3a6081cc9cce9eee8d61474e8e48ef48a242525641278d8e16b2ba3717618f9c99156e8f1f74d71f5dc209f136326331540c209395f2b1d2eef90cee3b598b5d480f8cd22c310221d67fb43197c63f11a7086229eb4620af84d5f3a7a231edaffdf4c603f9f68553ca2971f2819b7efcfa2f176bcb18ad274d93b9755b5cf20781d2f499ff22fd0248a55db97bf10bfe048cbf50c4883f687187c9aa21d448209966de3658347721f2ad9a0f5df0456bad805d91c103b48b0dd1da6b015690ab69261384421b84fe53542f47395a90d91224dcc5c97af2475d1094851efc4be2d2a5328bcf58fe427b31321d87098f28d7170df334c2fbb1485b9bfe41261d
+pub key hash is: 2462abce4b453df9a1a0798a6047b5a52e19b6e6c5785f490552fe010d8ee298
+image.py: sign the payload
+tlv sig: 2f08bce07553e1d6c9bb43183b230c75d03228f69ee76b9c3024a53ac87a29e4b0c9a5405f97074a333713de63562b94faa6ff6b3cab2e048b23f861bb022960b6bc824dbe7ae3e752362fc613699b9c5c1a95ce575a0ddaacf65589cc9c581407408c29c69b5a0630b66a8f24a2e07a3ce2d7825711d8247a5c8c85edebbbaccdaa3aa60b9f852a684a970ba1e2b00a8e210fa69f3d1a28429c82dd9dbb4e9b662940fd418b8a651e867dcbaddfc1fab293c4ec39141c141dd6eb015d5a86db086a281ca2325cd587b864d850bb7eb210f57d10cf55ced44b27aab113785815c7bfd17d10687ddaed1518ff424ecffe968b8be0016c4d2536275cbb76e5d9b7
+['D:\\XC8064\\0818-\\XC8064\\gd32-secure-boot-secure-firmware-update\\Project', 'C:\\Users\\xjl\\AppData\\Local\\Programs\\Python\\Python312\\python312.zip', 'C:\\Users\\xjl\\AppData\\Local\\Programs\\Python\\Python312\\DLLs', 'C:\\Users\\xjl\\AppData\\Local\\Programs\\Python\\Python312\\Lib', 'C:\\Users\\xjl\\AppData\\Local\\Programs\\Python\\Python312', 'C:\\Users\\xjl\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages', 'D:\\XC8064\\0818-\\XC8064\\gd32-secure-boot-secure-firmware-update\\Project/..']
+partition =  SYS_SET   offset =  0
+partition =  MBL   offset =  4096
+".\mbl\Objects\mbl.axf" - 0 Error(s), 0 Warning(s).
+
+<h2>Software Packages used:</h2>
+
+Package Vendor: GigaDevice
+                https://gd32mcu.com/data/documents/pack/GigaDevice.GD32F5xx_DFP.1.2.0.pack
+                GigaDevice::GD32F5xx_DFP@1.2.0
+                GigaDevice GD32F5xx Series Device Support and Examples
+
+<h2>Collection of Component include folders:</h2>
+
+<h2>Collection of Component Files used:</h2>
+Build Time Elapsed:  00:00:02
+</pre>
+</body>
+</html>

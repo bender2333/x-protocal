@@ -1,0 +1,1317 @@
+{
+  "name": "XC8064",
+  "type": "ARM",
+  "dependenceList": [],
+  "srcDirs": [
+    "../../../lwip/lwip-2.1.2"
+  ],
+  "virtualFolder": {
+    "name": "<virtual_root>",
+    "folders": [
+      {
+        "name": "App",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../App/AppConfig.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/CalibrateTable.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/CommMon.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/CRC16.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/eeprom.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/gd32f5xx_it.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/PCF8563.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/StrDef.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/USBSerial.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../App/main.c"
+          },
+          {
+            "path": "../../App/SerialPort.c"
+          },
+          {
+            "path": "../../App/FuncBlock.c"
+          }
+        ],
+        "folders": [
+          {
+            "name": "CMSIS",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../App/CMSIS/system_gd32f5xx.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Startup",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../App/Startup/startup_gd32f5xx.s"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "lwip",
+            "files": [
+              {
+                "path": "../../App/lwip/hello_gigadevice.c"
+              },
+              {
+                "path": "../../App/lwip/mekiEnet.c"
+              },
+              {
+                "path": "../../App/lwip/netconf.c"
+              },
+              {
+                "path": "../../App/lwip/lwiperf.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Modbus",
+            "files": [
+              {
+                "path": "../../App/Modbus/ModbusSerial.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusSpecialRegs.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusFuncs.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusRegs.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusRegsCal.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusTCP.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusSerial2.c"
+              },
+              {
+                "path": "../../App/Modbus/ModbusExpRegs.c"
+              }
+            ],
+            "folders": [
+              {
+                "name": "Master",
+                "files": [
+                  {
+                    "path": "../../App/Modbus/ModbusConnector.c"
+                  },
+                  {
+                    "path": "../../App/Modbus/ModbusMaster.c"
+                  },
+                  {
+                    "path": "../../App/Modbus/ModbusClient.c"
+                  }
+                ],
+                "folders": []
+              }
+            ]
+          },
+          {
+            "name": "BACnet",
+            "files": [
+              {
+                "path": "../../App/Bacnet/BacnetApp.c"
+              },
+              {
+                "path": "../../App/Bacnet/BacnetCOV.c"
+              },
+              {
+                "path": "../../App/Bacnet/BacnetMSTPServer.c"
+              },
+              {
+                "path": "../../App/Bacnet/datalink.c"
+              },
+              {
+                "path": "../../App/Bacnet/BacnetIPServer.c"
+              }
+            ],
+            "folders": [
+              {
+                "name": "BACnetMstp",
+                "files": [
+                  {
+                    "path": "../../App/Bacnet/BACnetMstp/mstp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/BACnetMstp/mstpRS485.c"
+                  }
+                ],
+                "folders": []
+              },
+              {
+                "name": "Handler",
+                "files": [
+                  {
+                    "path": "../../App/Bacnet/Handler/h_alarm_ack.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_arf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_awf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_ccov.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_ccovAck.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_cov.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_dcc.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_get_alarm_sum.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_getevent.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_iam.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_npdu.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_pt.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_rd.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_rp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_rpm.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_rr.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_ts.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_ucov.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_whohas.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_whois.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_wp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/h_wpm.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/noserv.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_cevent.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_iam.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_ihave.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_router.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_uevent.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/s_whois.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Handler/txbuf.c"
+                  }
+                ],
+                "folders": []
+              },
+              {
+                "name": "Object",
+                "files": [
+                  {
+                    "path": "../../App/Bacnet/Object/schedule.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/tempTable.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/TotaliserObj.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/ai.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/ao.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/av.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/bi.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/bo.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/bv.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/cal.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/device.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/iv.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/msv.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/nc.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/netport.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Object/PulseAccumObj.c"
+                  }
+                ],
+                "folders": []
+              },
+              {
+                "name": "Src",
+                "files": [
+                  {
+                    "path": "../../App/Bacnet/Src/abort.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/address.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/alarm_ack.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/apdu.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/arf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/awf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacaddr.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacapp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacdcode.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacdevobjpropref.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacerror.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacint.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacprop.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacpropstates.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacreal.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bacstr.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bactext.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bactimevalue.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bigend.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/bvlc.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/calendar.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/cov.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/crc.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/datetime.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/dcc.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/debug.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/event.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/fifo.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/filename.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/get_alarm_sum.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/getevent.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/hostnport.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/iam.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/ihave.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/indtext.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/key.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/keylist.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/lso.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/memcopy.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/npdu.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/proplist.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/ptransfer.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/rd.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/readrange.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/reject.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/ringbuf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/rp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/rpm.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/sbuf.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/timestamp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/timesync.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/tsm.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/version.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/whohas.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/whois.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/wp.c"
+                  },
+                  {
+                    "path": "../../App/Bacnet/Src/wpm.c"
+                  }
+                ],
+                "folders": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Automation",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../../Automation/Calibration.c"
+          }
+        ],
+        "folders": [
+          {
+            "name": "IO",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../Automation/IO/AnalogueInput.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../Automation/IO/AnalogueOutput.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../Automation/IO/DigitalInput.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../Automation/IO/DigitalOutput.c"
+              },
+              {
+                "path": "../../../Automation/IO/UIO.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Others",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../Automation/Others/PulseAccum.c"
+              }
+            ],
+            "folders": []
+          }
+        ]
+      },
+      {
+        "name": "board",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../../board/src/KEYCfg.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../board/src/LEDCfg.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../board/src/mekiInit.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../board/src/RTCCfg.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../board/src/UARTCfg.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../board/src/WATCHDOGCfg.c"
+          },
+          {
+            "path": "../../../board/src/systick.c"
+          }
+        ],
+        "folders": []
+      },
+      {
+        "name": "EKStdLib",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKFifo.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKI2C.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKLED.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKStream.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKTimer.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKUart.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKUsbCDC.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../EKStdLib/EKUtil.c"
+          }
+        ],
+        "folders": []
+      },
+      {
+        "name": "FreeRTOS",
+        "files": [],
+        "folders": [
+          {
+            "name": "freertos_core",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/croutine.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/event_groups.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/list.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/queue.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/stream_buffer.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/tasks.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/timers.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "freertos_port",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/portable/MemMang/heap_4.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/portable/IAR/ARM_CM23_NTZ/non_secure/mpu_wrappers_v2_asm.S"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../FreeRTOS/portable/IAR/ARM_CM33_NTZ/non_secure/portasm.s"
+              },
+              {
+                "path": "../../../FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure/portasm.c"
+              },
+              {
+                "path": "../../../FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure/port.c"
+              }
+            ],
+            "folders": []
+          }
+        ]
+      },
+      {
+        "name": "GD32F",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_adc.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_ai.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_ao.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_dac.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_di.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_do.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_enet.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_flash.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_led.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_ms5262d.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_pga116.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_PulseAccumTimer.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_pwm.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_sdram.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_sn74595.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_softi2c.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_softspi.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_spiflash.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_ssi.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_stream.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_svc.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_systick.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_uart.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_usbd.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../GD32F/dev_util.c"
+          },
+          {
+            "path": "../../../GD32F/dev_uio.c"
+          },
+          {
+            "path": "../../../GD32F/dev_w25q128.c"
+          }
+        ],
+        "folders": [
+          {
+            "name": "GD32F5xx_Firmware_Library_V1.2.0",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_adc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_can.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_aes.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_des.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_tdes.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_crc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_ctc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dac.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dbg.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dci.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dma.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_enet.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_exmc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_exti.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_fmc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_fwdgt.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_gpio.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_hau.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_hau_sha_md5.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_i2c.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_i2c_add.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_ipa.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_iref.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_misc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_pkcau.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_pmu.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_rcu.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_rtc.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_sai.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_sdio.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_spi.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_syscfg.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_timer.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_tli.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_trng.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_usart.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_wwdgt.c"
+              }
+            ],
+            "folders": []
+          }
+        ]
+      },
+      {
+        "name": "GF32F5xx_usb_library",
+        "files": [],
+        "folders": [
+          {
+            "name": "config",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/config/Source/gd32f5xx_hw.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "device",
+            "files": [],
+            "folders": [
+              {
+                "name": "class",
+                "files": [],
+                "folders": [
+                  {
+                    "name": "cdc",
+                    "files": [
+                      {
+                        "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/class/cdc/Source/cdc_acm_core.c"
+                      }
+                    ],
+                    "folders": []
+                  }
+                ]
+              },
+              {
+                "name": "core",
+                "files": [
+                  {
+                    "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/core/Source/usbd_core.c"
+                  },
+                  {
+                    "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/core/Source/usbd_enum.c"
+                  },
+                  {
+                    "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/core/Source/usbd_transc.c"
+                  }
+                ],
+                "folders": []
+              }
+            ]
+          },
+          {
+            "name": "driver",
+            "files": [
+              {
+                "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/driver/Source/drv_usb_core.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/driver/Source/drv_usb_dev.c"
+              },
+              {
+                "path": "${PROJ_DIR}/../../../GD32F5xx_usb_library/driver/Source/drv_usbd_int.c"
+              }
+            ],
+            "folders": []
+          }
+        ]
+      },
+      {
+        "name": "mekiLib",
+        "files": [
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/meki_RTC.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/meki_wwtdg.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/mekiKEY.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/mekiLED.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/mekiTimer.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/mekiUart.c"
+          },
+          {
+            "path": "${PROJ_DIR}/../../../mekiLib/src/mekiUsbCDC.c"
+          }
+        ],
+        "folders": []
+      },
+      {
+        "name": "ModbusV2",
+        "files": [
+          {
+            "path": "../../../ModbusV2/ModbusServer.c"
+          }
+        ],
+        "folders": []
+      },
+      {
+        "name": "FuncBlockFB",
+        "files": [
+          {
+            "path": "../../../FuncBlockFB/types.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/a2d.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/extComm.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/flatches.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/fmath.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/func.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/futil.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/hostComm.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/HVAC.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/Logic.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/ModbusSlave.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/p2p.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/priority.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/RegistersExport.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/schedule.c"
+          },
+          {
+            "path": "../../../FuncBlockFB/timing.c"
+          }
+        ],
+        "folders": []
+      }
+    ],
+    "files": [
+      {
+        "path": "${PROJ_DIR}/../GD32F527xM.icf"
+      },
+      {
+        "path": "${PROJ_DIR}/../GD32F527xS.icf"
+      }
+    ]
+  },
+  "outDir": "build",
+  "deviceName": null,
+  "packDir": null,
+  "miscInfo": {
+    "uid": "e128b7c42fd68e5e3f6830ac46926d92"
+  },
+  "targets": {
+    "Debug": {
+      "excludeList": [
+        "<virtual_root>/board/WATCHDOGCfg.c",
+        "<virtual_root>/GD32F/dev_adc.c",
+        "<virtual_root>/GD32F/dev_enet.c",
+        "<virtual_root>/GD32F/dev_softspi.c",
+        "<virtual_root>/mekiLib/meki_wwtdg.c",
+        "<virtual_root>/mekiLib/mekiTimer.c",
+        "<virtual_root>/FreeRTOS/freertos_port/portasm.s",
+        "<virtual_root>/FreeRTOS/freertos_port/mpu_wrappers_v2_asm.S",
+        "<virtual_root>/GD32F/dev_ao.c",
+        "<virtual_root>/GD32F/dev_ai.c",
+        "../../../lwip/lwip-2.1.2/port/GD32F5xx/Basic",
+        "../../../lwip/lwip-2.1.2/doc",
+        "../../../lwip/lwip-2.1.2/test",
+        "<virtual_root>/board/KEYCfg.c",
+        "<virtual_root>/board/LEDCfg.c",
+        "<virtual_root>/board/mekiInit.c",
+        "<virtual_root>/board/RTCCfg.c",
+        "<virtual_root>/board/UARTCfg.c",
+        "<virtual_root>/GD32F/dev_spiflash.c",
+        "<virtual_root>/App/lwip/phy.c",
+        "<virtual_root>/App/BACnet/Object/TotaliserObj.c",
+        "<virtual_root>/App/BACnet/Object/tempTable.c",
+        "<virtual_root>/mekiLib/meki_RTC.c",
+        "<virtual_root>/mekiLib/mekiKEY.c",
+        "<virtual_root>/mekiLib/mekiUart.c",
+        "<virtual_root>/mekiLib/mekiUsbCDC.c",
+        "<virtual_root>/mekiLib/mekiLED.c",
+        "<virtual_root>/mekiLib",
+        "../../../lwip/lwip-2.1.2/src/apps",
+        "<virtual_root>/FuncBlockFB/extComm.c",
+        "<virtual_root>/FuncBlockFB/ModbusSlave.c",
+        "<virtual_root>/FuncBlockFB/a2d.c",
+        "<virtual_root>/FuncBlockFB/p2p.c"
+      ],
+      "toolchain": "GCC",
+      "compileConfig": {
+        "cpuType": "Cortex-M33",
+        "floatingPointHardware": "single",
+        "scatterFilePath": "..\\gd32f5xx_flash.ld",
+        "useCustomScatterFile": true,
+        "storageLayout": {
+          "RAM": [],
+          "ROM": []
+        },
+        "options": "null",
+        "archExtensions": ""
+      },
+      "uploader": "JLink",
+      "uploadConfig": {
+        "bin": "",
+        "baseAddr": "",
+        "cpuInfo": {
+          "vendor": "GigaDevice",
+          "cpuName": "GD32F527ZM"
+        },
+        "proType": 1,
+        "speed": 8000,
+        "otherCmds": ""
+      },
+      "uploadConfigMap": {},
+      "custom_dep": {
+        "name": "default",
+        "incList": [
+          "${PROJ_DIR}/../../../FreeRTOS/include",
+          "${PROJ_DIR}/../../../FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure",
+          "${PROJ_DIR}/../../../GD32F",
+          "${PROJ_DIR}/../../../EKStdLib",
+          "${PROJ_DIR}/../../../Automation",
+          "${PROJ_DIR}/../../../Automation/IO",
+          "${PROJ_DIR}/../../../Automation/Others",
+          "${PROJ_DIR}/../../App",
+          "${PROJ_DIR}/../../App/CMSIS",
+          "${PROJ_DIR}/../../App/Startup",
+          "${PROJ_DIR}/../../../mekiLib/inc",
+          "${PROJ_DIR}/../../../board/inc",
+          "${PROJ_DIR}/../../../GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Include",
+          "${PROJ_DIR}/../../../GD32F5xx_usb_library/driver/Include",
+          "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/class/cdc/Include",
+          "${PROJ_DIR}/../../../GD32F5xx_usb_library/device/core/Include",
+          "${PROJ_DIR}/../../../GD32F5xx_usb_library/config/Include",
+          "${PROJ_DIR}/../../../ModbusV2",
+          "${PROJ_DIR}/../../App/Modbus",
+          "${PROJ_DIR}/../../../lwip/lwip-2.1.2/port/GD32F5xx",
+          "${PROJ_DIR}/../../../lwip/lwip-2.1.2/port/GD32F5xx/FreeRTOS",
+          "${PROJ_DIR}/../../../lwip/lwip-2.1.2/src/include",
+          "${PROJ_DIR}/../../../lwip/lwip-2.1.2/src/include/lwip",
+          "${PROJ_DIR}/../../App/lwip",
+          "${PROJ_DIR}/../../../lwip/lwip-2.1.2/port/GD32F5xx/arch",
+          "${PROJ_DIR}/../../App/Bacnet/BACnetMstp",
+          "${PROJ_DIR}/../../App/Bacnet/include",
+          "${PROJ_DIR}/../../App/Bacnet",
+          "${PROJ_DIR}/../../App/Bacnet/Object",
+          "${PROJ_DIR}/../../../FuncBlockFB"
+          "../../../GD32F5xx_usb_library/device/class/msc/Include",
+          "../../../GD32F5xx_usb_library/ustd/class/msc",
+          "../../../GD32F5xx_usb_library/config/Include",
+          "../../../gd32-secure-boot-secure-firmware-update",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/bootutil/include/bootutil",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/bootutil/include",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mbedtls-2.17.0/include",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice/include",
+          "../../../gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice/include/flash_map_backend",
+          "../../../gd32-secure-boot-secure-firmware-update/Source/IBL_Source",
+          "../../../gd32-secure-boot-secure-firmware-update/Platform/IBL",
+          "../../../gd32-secure-boot-secure-firmware-update/Platform/APP"
+        ],
+        "libList": [],
+        "defineList": [
+          "GD32F527",
+          "USE_STDPERIPH_DRIVER",
+          "USE_USB_FS",
+          "ewarm",
+          "PLATFORM_GD32F5XX"
+        ]
+      },
+      "builderOptions": {
+        "IAR_ARM": {
+          "version": 1,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [],
+          "global": {
+            "endian-mode": "little",
+            "runtime-lib": "normal",
+            "printf-formatter": "auto",
+            "scanf-formatter": "auto",
+            "output-debug-info": "enable"
+          },
+          "c/cpp-compiler": {
+            "optimization": "none",
+            "destroy-cpp-static-object": true,
+            "language-c": "c99",
+            "language-conformance": "IAR-extensions",
+            "use-cpp-inline-semantics": true,
+            "floating-point-semantics": "strict",
+            "misc-controls": ""
+          },
+          "asm-compiler": {
+            "case-sensitive-user-symbols": true,
+            "defines": []
+          },
+          "linker": {
+            "output-format": "elf",
+            "auto-search-runtime-lib": true,
+            "perform-cpp-virtual-func-elimination": "disable",
+            "config-defines": [],
+            "LIB_FLAGS": [],
+            "misc-controls": ""
+          }
+        },
+        "GCC": {
+          "version": 5,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [
+            {
+              "name": "python ..\\..\\..\\afterbuild.py false(download used)",
+              "disable": false,
+              "abortAfterFailed": true,
+              "command": "python \"./../../../gd32-secure-boot-secure-firmware-update/Project/afterbuild.py\" project_deal -enc False -pn APP -op \"${OutDir}/\" -on \"XC8064\" -ide GCC -ip \"${ToolchainRoot}/arm-none-eab/bin\""
+            },
+            {
+              "name": "python ..\\..\\..\\afterbuild.py true (ota used)",
+              "disable": true,
+              "abortAfterFailed": true,
+              "command": "python \"./../../../gd32-secure-boot-secure-firmware-update/Project/afterbuild.py\" project_deal -enc True -pn APP -op \"${OutDir}/\" -on \"XC8064\" -ide GCC -ip \"${ToolchainRoot}/arm-none-eab/bin\""
+            }
+          ],
+          "global": {
+            "$float-abi-type": "softfp",
+            "output-debug-info": "enable",
+            "misc-control": "--specs=nosys.specs --specs=nano.specs"
+          },
+          "c/cpp-compiler": {
+            "language-c": "c11",
+            "language-cpp": "c++11",
+            "optimization": "level-0",
+            "warnings": "all-warnings",
+            "one-elf-section-per-function": true,
+            "one-elf-section-per-data": true,
+            "C_FLAGS": "-Wno-format -Wno-address-of-packed-member"
+          },
+          "asm-compiler": {},
+          "linker": {
+            "output-format": "elf",
+            "remove-unused-input-sections": true,
+            "LIB_FLAGS": "-lm -specs=rdimon.specs -lc -lrdimon",
+            "$toolName": "auto"
+          }
+        }
+      }
+    },
+    "Release": {
+      "excludeList": [],
+      "toolchain": "IAR_ARM",
+      "compileConfig": {
+        "cpuType": "Cortex-M4",
+        "floatingPointHardware": "none",
+        "scatterFilePath": "${PROJ_DIR}/../GD32F407xE_flash.icf",
+        "useCustomScatterFile": true,
+        "storageLayout": {
+          "RAM": [],
+          "ROM": []
+        },
+        "options": "null"
+      },
+      "uploader": "JLink",
+      "uploadConfig": {
+        "bin": "",
+        "baseAddr": "",
+        "cpuInfo": {
+          "vendor": "null",
+          "cpuName": "null"
+        },
+        "proType": 1,
+        "speed": 8000,
+        "otherCmds": ""
+      },
+      "uploadConfigMap": {},
+      "custom_dep": {
+        "name": "default",
+        "incList": [
+          "${PROJ_DIR}/../../../GD32F",
+          "${PROJ_DIR}/../../../GD32F/GD32F4xx_Firmware_Library_V2.1.3/Firmware/CMSIS/GD/GD32F4xx/Include",
+          "${PROJ_DIR}/../../../GD32F/GD32F4xx_Firmware_Library_V2.1.3/Firmware/GD32F4xx_standard_peripheral/Include",
+          "${PROJ_DIR}/../../../EKStdLib",
+          "${PROJ_DIR}/../../../Automation",
+          "${PROJ_DIR}/../../../Automation/IO",
+          "${PROJ_DIR}/../../../Automation/Others",
+          "${PROJ_DIR}/../../../ModbusV2",
+          "${PROJ_DIR}/../../../Bacnet",
+          "${PROJ_DIR}/../../../Bacnet/include",
+          "${PROJ_DIR}/../../App",
+          "${PROJ_DIR}/../../App/Modbus",
+          "${PROJ_DIR}/../../App/Bacnet",
+          "${PROJ_DIR}/../../App/Bacnet/Object",
+          "${PROJ_DIR}/../../App/CMSIS",
+          "${PROJ_DIR}/../../App/Startup",
+          "${PROJ_DIR}/../../../../FuncBlock"
+        ],
+        "defineList": [
+          "ewarm",
+          "NDEBUG",
+          "GD32F407",
+          "USE_HAL_DRIVER",
+          "XC8064"
+        ],
+        "libList": []
+      },
+      "builderOptions": {
+        "IAR_ARM": {
+          "version": 1,
+          "beforeBuildTasks": [],
+          "afterBuildTasks": [],
+          "global": {
+            "endian-mode": "little",
+            "runtime-lib": "normal",
+            "printf-formatter": "auto",
+            "scanf-formatter": "auto",
+            "output-debug-info": "enable"
+          },
+          "c/cpp-compiler": {
+            "optimization": "none",
+            "destroy-cpp-static-object": true,
+            "language-c": "c99",
+            "language-conformance": "IAR-extensions",
+            "use-cpp-inline-semantics": true,
+            "floating-point-semantics": "strict",
+            "misc-controls": ""
+          },
+          "asm-compiler": {
+            "case-sensitive-user-symbols": true,
+            "defines": []
+          },
+          "linker": {
+            "output-format": "elf",
+            "auto-search-runtime-lib": true,
+            "perform-cpp-virtual-func-elimination": "disable",
+            "config-defines": [],
+            "LIB_FLAGS": [],
+            "misc-controls": "--keep __checksum"
+          }
+        }
+      }
+    }
+  },
+  "version": "3.6"
+}

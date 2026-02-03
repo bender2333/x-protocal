@@ -1,0 +1,4 @@
+#<SYMDEFS># ARM Linker, 6090000: Last Updated: 2025-08-22 09:16:25
+0x8065aa1 T flash_area_open
+0x80643f9 T boot_write_image_ok
+0x8064455 T boot_write_magic

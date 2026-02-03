@@ -1,0 +1,176 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Dependencies" id="1">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="800" background="#ffffff">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <mxCell id="title" value="XC8064V2 Library Dependencies" style="text;fontSize=18;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="250" y="20" width="400" height="30" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="EKStdLib" value="libEKStdLib.a&#xa;&#xa;→ libDriver.a" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="120" y="100" width="130" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="Driver" value="libDriver.a&#xa;&#xa;→ libEKStdLib.a&#xa;→ libApp.a" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="320" y="100" width="130" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="App" value="libApp.a&#xa;&#xa;→ libDriver.a&#xa;→ libEKStdLib.a" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontColor=#000000;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="220" y="240" width="130" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="Automation" value="libAutomationIO.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="50" y="400" width="120" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="Bacnet" value="libBACnet.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App&#xa;→ FuncBlockFB" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="200" y="400" width="120" height="95" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="FuncBlockFB" value="libFuncBlockFB.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="350" y="400" width="130" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="lwip" value="libLwip.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="510" y="400" width="110" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="Modbus" value="libModbus.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App" style="rounded=1;fillColor=#ffcccc;strokeColor=#b85450;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="650" y="400" width="110" height="80" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="OTA" value="libOTA.a&#xa;&#xa;→ Driver&#xa;→ EKStdLib&#xa;→ App" style="rounded=1;fillColor=#cce5ff;strokeColor=#4682b4;strokeWidth=2;fontColor=#000000;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="790" y="400" width="110" height="80" as="geometry"/>
+        </mxCell>
+        
+        <!-- Mutual dependency (circular) -->
+        <mxCell id="mutual" value="" style="endArrow=classic;startArrow=classic;strokeWidth=2;strokeColor=#ff0000;" parent="1" source="EKStdLib" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- App and Driver mutual dependency -->
+        <mxCell id="app-driver-mutual" value="" style="endArrow=classic;startArrow=classic;strokeWidth=2;strokeColor=#ff0000;" parent="1" source="App" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- App depends on EKStdLib -->
+        <mxCell id="app-ek" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="App" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- All modules depend on App -->
+        <mxCell id="auto-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="Automation" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="bacnet-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="Bacnet" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="func-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="FuncBlockFB" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="lwip-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="lwip" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="modbus-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="Modbus" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="ota-app" value="" style="endArrow=classic;strokeWidth=1.5;strokeColor=#333333;" parent="1" source="OTA" target="App" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- All modules depend on Driver and EKStdLib -->
+        <mxCell id="auto-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Automation" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="auto-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Automation" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="bacnet-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Bacnet" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="bacnet-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Bacnet" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="func-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="FuncBlockFB" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="func-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="FuncBlockFB" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="lwip-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="lwip" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="lwip-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="lwip" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="modbus-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Modbus" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="modbus-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="Modbus" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="ota-dr" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="OTA" target="Driver" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ota-ek" value="" style="endArrow=classic;strokeWidth=1;strokeColor=#999999;dashed=1;" parent="1" source="OTA" target="EKStdLib" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Bacnet special dependency on FuncBlockFB -->
+        <mxCell id="bacnet-func" value="" style="endArrow=classic;strokeWidth=2;strokeColor=#ff6600;" parent="1" source="Bacnet" target="FuncBlockFB" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        
+        <!-- Enhanced Legend -->
+        <mxCell id="legend-box" value="Legend" style="rounded=1;fillColor=#f5f5f5;strokeColor=#333333;strokeWidth=2;fontColor=#000000;fontSize=13;fontStyle=1;align=center;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="270" y="540" width="360" height="140" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="leg-red-line" value="" style="line;strokeWidth=3;strokeColor=#ff0000;endArrow=classic;startArrow=classic;" parent="1" vertex="1">
+          <mxGeometry x="290" y="575" width="60" height="10" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg-red-text" value="Red: Circular dependency (mutual)" style="text;fontSize=11;fontColor=#000000;align=left;" parent="1" vertex="1">
+          <mxGeometry x="360" y="570" width="250" height="20" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="leg-black-line" value="" style="line;strokeWidth=2;strokeColor=#333333;endArrow=classic;" parent="1" vertex="1">
+          <mxGeometry x="290" y="600" width="60" height="10" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg-black-text" value="Black solid: Direct dependency" style="text;fontSize=11;fontColor=#000000;align=left;" parent="1" vertex="1">
+          <mxGeometry x="360" y="595" width="250" height="20" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="leg-gray-line" value="" style="line;strokeWidth=1;strokeColor=#999999;endArrow=classic;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="290" y="625" width="60" height="10" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg-gray-text" value="Gray dashed: Indirect dependency" style="text;fontSize=11;fontColor=#000000;align=left;" parent="1" vertex="1">
+          <mxGeometry x="360" y="620" width="250" height="20" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="leg-orange-line" value="" style="line;strokeWidth=3;strokeColor=#ff6600;endArrow=classic;" parent="1" vertex="1">
+          <mxGeometry x="290" y="650" width="60" height="10" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg-orange-text" value="Orange: Additional direct dependency" style="text;fontSize=11;fontColor=#000000;align=left;" parent="1" vertex="1">
+          <mxGeometry x="360" y="645" width="250" height="20" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="summary" value="Total: 9 libraries | Arrow direction: A → B means A depends on B" style="text;fontSize=11;fontColor=#666666;align=center;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="200" y="720" width="500" height="25" as="geometry"/>
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

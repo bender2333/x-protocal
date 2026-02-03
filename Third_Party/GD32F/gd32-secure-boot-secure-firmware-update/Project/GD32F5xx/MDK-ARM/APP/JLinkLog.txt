@@ -1,0 +1,193 @@
+T0A88 002:344.789   SEGGER J-Link V8.16 Log File
+T0A88 002:344.863   DLL Compiled: Feb 26 2025 12:07:26
+T0A88 002:344.869   Logging started @ 2025-08-07 08:12
+T0A88 002:344.873   Process: C:\Users\vince\AppData\Local\Keil_v5\UV4\UV4.exe
+T0A88 002:344.877 - 22.635ms 
+T0A88 002:344.883 JLINK_SetWarnOutHandler(...)
+T0A88 002:344.887 - 0.003ms 
+T0A88 002:344.891 JLINK_OpenEx(...)
+T0A88 002:348.031   Firmware: J-Link V11 compiled Apr 27 2041 16:36:21
+T0A88 002:349.906   Firmware: J-Link V11 compiled Apr 27 2041 16:36:21
+T0A88 002:371.887   Hardware: V11.00
+T0A88 002:371.905   S/N: 941000024
+T0A88 002:371.910   OEM: SEGGER
+T0A88 002:371.915   Feature(s): GDB, JFlash, FlashDL, RDI, FlashBP
+T0A88 002:374.242   Bootloader: (FW returned invalid version)
+T0A88 002:375.831   TELNET listener socket opened on port 19021
+T0A88 002:379.406   WEBSRV WEBSRV_Init(): Starting webserver thread(s)
+T0A88 002:379.582   WEBSRV Webserver running on local port 19080
+T0A88 002:379.718   Looking for J-Link GUI Server exe at: C:\Users\vince\AppData\Local\Keil_v5\ARM\Segger\JLinkGUIServer.exe
+T0A88 002:379.777   Looking for J-Link GUI Server exe at: C:\Program Files\SEGGER_V798\JLink_V798c\JLinkGUIServer.exe
+T0A88 002:379.799   Forking J-Link GUI Server: C:\Program Files\SEGGER_V798\JLink_V798c\JLinkGUIServer.exe
+T0A88 002:381.907   J-Link GUI Server info: "J-Link GUI server V7.98c "
+T0A88 002:382.149 - 37.257ms returns "O.K."
+T0A88 002:382.173 JLINK_GetEmuCaps()
+T0A88 002:382.178 - 0.004ms returns 0xB9FF7BBF
+T0A88 002:382.183 JLINK_TIF_GetAvailable(...)
+T0A88 002:382.845 - 0.662ms 
+T0A88 002:382.861 JLINK_SetErrorOutHandler(...)
+T0A88 002:382.866 - 0.004ms 
+T0A88 002:382.879 JLINK_ExecCommand("ProjectFile = "C:\D_Drive\Development_bak\Development\STM32\gd32-secure-boot-secure-firmware-update\Project\GD32F5xx\MDK-ARM\APP\JLinkSettings.ini"", ...). 
+T0A88 002:384.891 - 2.011ms returns 0x00
+T0A88 002:384.911 JLINK_ExecCommand("Device = GD32F527ZM", ...). 
+T0A88 002:384.953   Flash bank @ 0x08000000: SFL: Parsing sectorization info from ELF file
+T0A88 002:384.959     FlashDevice.SectorInfo[0]: .SectorSize = 0x00001000, .SectorStartAddr = 0x00000000
+T0A88 002:384.965   FlashBank @0x08000000: Sectorization info from SFL ELF file ignored because sectorization override from DLL / XML file is active.
+T0A88 002:385.398   Flash bank @ 0x1FFFC000: SFL: Parsing sectorization info from ELF file
+T0A88 002:385.411     FlashDevice.SectorInfo[0]: .SectorSize = 0x00000010, .SectorStartAddr = 0x00000000
+T0A88 002:385.417   FlashBank @0x1FFEC000: Sectorization info from SFL ELF file ignored because sectorization override from DLL / XML file is active.
+T0A88 002:385.461   Device "GD32F527ZMT7" selected.
+T0A88 002:385.719 - 0.801ms returns 0x00
+T0A88 002:385.730 JLINK_ExecCommand("DisableConnectionTimeout", ...). 
+T0A88 002:385.737   ERROR: Unknown command
+T0A88 002:385.743 - 0.007ms returns 0x01
+T0A88 002:385.748 JLINK_GetHardwareVersion()
+T0A88 002:385.752 - 0.004ms returns 110000
+T0A88 002:385.757 JLINK_GetDLLVersion()
+T0A88 002:385.760 - 0.003ms returns 81600
+T0A88 002:385.765 JLINK_GetOEMString(...)
+T0A88 002:385.769 JLINK_GetFirmwareString(...)
+T0A88 002:385.773 - 0.003ms 
+T0A88 002:385.781 JLINK_GetDLLVersion()
+T0A88 002:385.784 - 0.003ms returns 81600
+T0A88 002:385.788 JLINK_GetCompileDateTime()
+T0A88 002:385.792 - 0.003ms 
+T0A88 002:385.797 JLINK_GetFirmwareString(...)
+T0A88 002:385.801 - 0.003ms 
+T0A88 002:385.805 JLINK_GetHardwareVersion()
+T0A88 002:385.809 - 0.003ms returns 110000
+T0A88 002:385.814 JLINK_GetSN()
+T0A88 002:385.817 - 0.003ms returns 941000024
+T0A88 002:385.822 JLINK_GetOEMString(...)
+T0A88 002:385.828 JLINK_TIF_Select(JLINKARM_TIF_SWD)
+T0A88 002:388.001 - 2.172ms returns 0x00
+T0A88 002:388.015 JLINK_HasError()
+T0A88 002:388.022 JLINK_SetSpeed(5000)
+T0A88 002:388.496 - 0.474ms 
+T0A88 002:388.718 JLINK_HasError()
+T0A88 002:388.726 JLINK_SetResetType(JLINKARM_RESET_TYPE_NORMAL)
+T0A88 002:388.731 - 0.004ms returns JLINKARM_RESET_TYPE_NORMAL
+T0A88 002:388.736 JLINK_Reset()
+T0A88 002:389.398   ConfigTargetSettings() start
+T0A88 002:389.436    J-Link Script File: Executing ConfigTargetSettings()
+T0A88 002:389.445   ConfigTargetSettings() end - Took 7us
+T0A88 002:389.451   InitTarget() start
+T0A88 002:389.457    J-Link Script File: Executing InitTarget()
+T0A88 002:389.462   SWD selected. Executing JTAG -> SWD switching sequence.
+T0A88 002:393.582     No Protection is set.
+T0A88 002:393.600   InitTarget() end - Took 4.14ms
+T0A88 002:394.822   Found SW-DP with ID 0x0BE12477
+T0A88 002:398.249   DPIDR: 0x0BE12477
+T0A88 002:398.261   CoreSight SoC-400 or earlier
+T0A88 002:398.267   Scanning AP map to find all available APs
+T0A88 002:399.267   AP[1]: Stopped AP scan as end of AP map has been reached
+T0A88 002:399.275   AP[0]: AHB-AP (IDR: 0x14770015, ADDR: 0x00000000)
+T0A88 002:399.280   Iterating through AP map to find AHB-AP to use
+T0A88 002:400.934   AP[0]: Core found
+T0A88 002:400.949   AP[0]: AHB-AP ROM base: 0xE00FE000
+T0A88 002:401.886   CPUID register: 0x410FD214. Implementer code: 0x41 (ARM)
+T0A88 002:401.897   Feature set: Mainline
+T0A88 002:402.757   Cache: No cache
+T0A88 002:402.764   Found Cortex-M33 r0p4, Little endian.
+T0A88 002:403.966   -- Max. mem block: 0x00004518
+T0A88 002:405.558   
+  ***** Warning: 
+T0A88 002:405.564   Cortex-M (ARMv8-M and later): The connected J-Link (S/N 941000024) uses an old firmware module that does not handle I/D-cache correctly. Proper debugging functionality cannot be guaranteed if cache is enabled
+T0A88 002:405.573   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 002:406.051   CPU_WriteMem(4 bytes @ 0xE000EDF0)
+T0A88 002:406.576   CPU_ReadMem(4 bytes @ 0xE0002000)
+T0A88 002:407.050   FPUnit: 8 code (BP) slots and 0 literal slots
+T0A88 002:407.056   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T0A88 002:407.680   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T0A88 002:408.090   CPU_ReadMem(4 bytes @ 0xE0001000)
+T0A88 002:408.632   CPU_ReadMem(4 bytes @ 0xE0001000)
+T0A88 002:409.193   CPU_ReadMem(4 bytes @ 0xE0001028)
+T0A88 002:409.653   CPU_ReadMem(4 bytes @ 0xE0001038)
+T0A88 002:410.162   CPU_ReadMem(4 bytes @ 0xE0001048)
+T0A88 002:410.675   CPU_ReadMem(4 bytes @ 0xE0001058)
+T0A88 002:411.731   CPU_WriteMem(4 bytes @ 0xE0001000)
+T0A88 002:412.451   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T0A88 002:413.406   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T0A88 002:414.218   CPU_ReadMem(4 bytes @ 0xE000ED88)
+T0A88 002:414.656   CPU_WriteMem(4 bytes @ 0xE000ED88)
+T0A88 002:415.191   CPU_ReadMem(4 bytes @ 0xE000EFB8)
+T0A88 002:415.656   Security extension: not implemented
+T0A88 002:415.662   CoreSight components:
+T0A88 002:415.668   ROMTbl[0] @ E00FE000
+T0A88 002:415.673   CPU_ReadMem(64 bytes @ 0xE00FE000)
+T0A88 002:416.426   CPU_ReadMem(32 bytes @ 0xE00FFFE0)
+T0A88 002:417.160   [0][0]: E00FF000 CID B105100D PID 000BB4C9 ROM Table
+T0A88 002:417.169   ROMTbl[1] @ E00FF000
+T0A88 002:417.175   CPU_ReadMem(64 bytes @ 0xE00FF000)
+T0A88 002:418.094   CPU_ReadMem(32 bytes @ 0xE000EFE0)
+T0A88 002:418.946   CPU_ReadMem(4 bytes @ 0xE000EFBC)
+T0A88 002:419.714   CPU_ReadMem(4 bytes @ 0xE000EFCC)
+T0A88 002:420.155   [1][0]: E000E000 CID B105900D PID 000BBD21 DEVARCH 47702A04 DEVTYPE 00 Cortex-M33
+T0A88 002:420.161   CPU_ReadMem(32 bytes @ 0xE0001FE0)
+T0A88 002:420.703   CPU_ReadMem(4 bytes @ 0xE0001FBC)
+T0A88 002:421.163   CPU_ReadMem(4 bytes @ 0xE0001FCC)
+T0A88 002:421.661   [1][1]: E0001000 CID B105900D PID 000BBD21 DEVARCH 47701A02 DEVTYPE 00 DWT
+T0A88 002:421.668   CPU_ReadMem(32 bytes @ 0xE0002FE0)
+T0A88 002:422.257   CPU_ReadMem(4 bytes @ 0xE0002FBC)
+T0A88 002:422.674   CPU_ReadMem(4 bytes @ 0xE0002FCC)
+T0A88 002:423.176   [1][2]: E0002000 CID B105900D PID 000BBD21 DEVARCH 47701A03 DEVTYPE 00 FPB
+T0A88 002:423.183   CPU_ReadMem(32 bytes @ 0xE0000FE0)
+T0A88 002:423.760   CPU_ReadMem(4 bytes @ 0xE0000FBC)
+T0A88 002:424.181   CPU_ReadMem(4 bytes @ 0xE0000FCC)
+T0A88 002:424.805   [1][3]: E0000000 CID B105900D PID 000BBD21 DEVARCH 47701A01 DEVTYPE 43 ITM
+T0A88 002:424.812   CPU_ReadMem(32 bytes @ 0xE0040FE0)
+T0A88 002:425.324   CPU_ReadMem(4 bytes @ 0xE0040FBC)
+T0A88 002:425.804   CPU_ReadMem(4 bytes @ 0xE0040FCC)
+T0A88 002:426.216   [0][1]: E0040000 CID B105900D PID 000BBD21 DEVARCH 00000000 DEVTYPE 11 TPIU
+T0A88 002:426.225   Initializing 262144 bytes work RAM @ 0x20000000
+T0A88 002:426.237   JLINK_GetResetTypeDesc
+T0A88 002:426.241   - 0.004ms 
+T0A88 002:426.246   Reset type: NORMAL (https://wiki.segger.com/J-Link_Reset_Strategies)
+T0A88 002:426.250   CPU is running
+T0A88 002:426.256   CPU_WriteMem(4 bytes @ 0xE000EDF0)
+T0A88 002:426.801   CPU_ReadMem(4 bytes @ 0xE000ED44)
+T0A88 002:427.258   CPU is running
+T0A88 002:427.264   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T0A88 002:427.801   Reset: Halt core after reset via DEMCR.VC_CORERESET.
+T0A88 002:428.764   Reset: Reset device via AIRCR.SYSRESETREQ.
+T0A88 002:428.771   CPU is running
+T0A88 002:428.776   CPU_WriteMem(4 bytes @ 0xE000ED0C)
+T0A88 002:484.473   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 002:484.951   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 002:487.719   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T0A88 002:493.990   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 002:497.735   CPU_ReadMem(4 bytes @ 0xE000EE08)
+T0A88 002:498.716   CPU_WriteMem(4 bytes @ 0xE0002000)
+T0A88 002:499.469   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T0A88 002:499.927   CPU_ReadMem(4 bytes @ 0xE0001000)
+T0A88 002:500.508   CPU_ReadMem(4 bytes @ 0xE000EE08)
+T0A88 002:501.042   CPU_WriteMem(262144 bytes @ 0x20000000)
+T0A88 003:227.546   JLINK_GetResetTypeDesc
+T0A88 003:227.565   - 0.018ms 
+T0A88 003:227.574   Reset type: NORMAL (https://wiki.segger.com/J-Link_Reset_Strategies)
+T0A88 003:227.581   CPU_WriteMem(4 bytes @ 0xE000EDF0)
+T0A88 003:228.366   CPU_ReadMem(4 bytes @ 0xE000ED44)
+T0A88 003:229.230   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T0A88 003:230.119   Reset: Halt core after reset via DEMCR.VC_CORERESET.
+T0A88 003:231.816   Reset: Reset device via AIRCR.SYSRESETREQ.
+T0A88 003:231.823   CPU_WriteMem(4 bytes @ 0xE000ED0C)
+T0A88 003:287.294   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 003:287.812   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 003:288.812   CPU_WriteMem(4 bytes @ 0xE000EDFC)
+T0A88 003:295.196   CPU_ReadMem(4 bytes @ 0xE000EDF0)
+T0A88 003:298.096   CPU_ReadMem(4 bytes @ 0xE000EE08)
+T0A88 003:298.781   CPU_WriteMem(4 bytes @ 0xE0002000)
+T0A88 003:299.240   CPU_ReadMem(4 bytes @ 0xE000EDFC)
+T0A88 003:299.924   CPU_ReadMem(4 bytes @ 0xE0001000)
+T0A88 003:300.761   CPU_ReadMem(4 bytes @ 0xE000EE08)
+T0A88 003:301.633 - 912.896ms 
+T0A88 003:301.648 JLINK_GetId()
+T0A88 003:302.381 - 0.733ms returns 0x0BE12477
+T0A88 003:303.322 JLINK_GetFirmwareString(...)
+T0A88 003:303.332 - 0.009ms 
+T0A88 003:332.983 JLINK_Close()
+T0A88 003:333.825   CPU_ReadMem(4 bytes @ 0xE0001000)
+T0A88 003:334.700   CPU_WriteMem(4 bytes @ 0xE0001004)
+T0A88 003:354.508 - 21.523ms
+T0A88 003:354.532   
+T0A88 003:354.537   Closed

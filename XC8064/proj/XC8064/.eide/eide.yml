@@ -1,0 +1,742 @@
+version: "4.1"
+name: XC8064
+type: ARM
+deviceName: null
+packDir: null
+srcDirs: []
+virtualFolder:
+  name: <virtual_root>
+  files:
+    - path: ${PROJ_DIR}/../GD32F527xM.icf
+    - path: ${PROJ_DIR}/../GD32F527xS.icf
+  folders:
+    - name: App
+      files:
+        - path: ${PROJ_DIR}/../../../App/gd32f5xx_it.c
+        - path: ${PROJ_DIR}/../../../App/main.c
+        - path: ../../../App/src/libApp.a
+        - path: ../../../App/inc/FuncBlock.h
+        - path: ../../../App/inc/OEM.h
+        - path: ../../../App/inc/PCF8563.h
+        - path: ../../../App/inc/SerialPort.h
+        - path: ../../../App/inc/StrDef.h
+        - path: ../../../App/inc/App.h
+        - path: ../../../App/inc/AppConfig.h
+        - path: ../../../App/inc/CalibrateTable.h
+        - path: ../../../App/inc/CommMon.h
+        - path: ../../../App/inc/eepromEmul.h
+        - path: ../../../App/inc/NTP.h
+        - path: ../../../App/Xslot/communication.h
+      folders:
+        - name: lwip
+          files:
+            - path: ../../../App/lwip/libLWIP.a
+            - path: ../../../App/lwip/netconf.h
+            - path: ../../../App/lwip/lwiperf.h
+            - path: ../../../App/lwip/lwipopts.h
+            - path: ../../../App/lwip/mekiEnet.h
+          folders: []
+        - name: Modbus
+          files:
+            - path: ../../../App/Modbus/src/libModbus.a
+            - path: ../../../App/Modbus/inc/ModbusServer.h
+            - path: ../../../App/Modbus/inc/ModbusTCP.h
+            - path: ../../../App/Modbus/inc/Modbus.h
+            - path: ../../../App/Modbus/inc/ModbusClient.h
+            - path: ../../../App/Modbus/inc/ModbusConnector.h
+            - path: ../../../App/Modbus/inc/ModbusExpRegs.h
+            - path: ../../../App/Modbus/inc/ModbusFuncs.h
+            - path: ../../../App/Modbus/inc/ModbusMaster.h
+            - path: ../../../App/Modbus/inc/ModbusOpts.h
+            - path: ../../../App/Modbus/inc/ModbusOptsCal.h
+            - path: ../../../App/Modbus/inc/ModbusOptsSpecialRegs.h
+            - path: ../../../App/Modbus/inc/ModbusRegs.h
+            - path: ../../../App/Modbus/inc/ModbusRegsCal.h
+            - path: ../../../App/Modbus/inc/ModbusRegsInfo.h
+            - path: ../../../App/Modbus/inc/ModbusSerial.h
+            - path: ../../../App/Modbus/inc/ModbusSerial2.h
+          folders: []
+        - name: BACnet
+          files:
+            - path: ../../../App/Bacnet/libBACnet.a
+          folders:
+            - name: BACnetApp
+              files:
+                - path: ../../../App/Bacnet/BACnetApp/mstpRS485.h
+                - path: ../../../App/Bacnet/BACnetApp/BacnetApp.h
+                - path: ../../../App/Bacnet/BACnetApp/BacnetCOV.h
+                - path: ../../../App/Bacnet/BACnetApp/BacnetIPServer.h
+                - path: ../../../App/Bacnet/BACnetApp/BacnetMSTPServer.h
+                - path: ../../../App/Bacnet/BACnetApp/config.h
+                - path: ../../../App/Bacnet/BACnetApp/datalink.h
+                - path: ../../../App/Bacnet/BACnetApp/mstp.h
+              folders: []
+            - name: Handler
+              files: []
+              folders: []
+            - name: Object
+              files:
+                - path: ../../../App/Bacnet/Object/ai.h
+                - path: ../../../App/Bacnet/Object/ao.h
+                - path: ../../../App/Bacnet/Object/av.h
+                - path: ../../../App/Bacnet/Object/bi.h
+                - path: ../../../App/Bacnet/Object/bo.h
+                - path: ../../../App/Bacnet/Object/bv.h
+                - path: ../../../App/Bacnet/Object/cal.h
+                - path: ../../../App/Bacnet/Object/Device.h
+                - path: ../../../App/Bacnet/Object/nc.h
+                - path: ../../../App/Bacnet/Object/netport.h
+                - path: ../../../App/Bacnet/Object/PulseAccumObj.h
+                - path: ../../../App/Bacnet/Object/schedule.h
+              folders: []
+            - name: Src
+              files: []
+              folders: []
+            - name: include
+              files:
+                - path: ../../../App/Bacnet/include/abort.h
+                - path: ../../../App/Bacnet/include/address.h
+                - path: ../../../App/Bacnet/include/alarm_ack.h
+                - path: ../../../App/Bacnet/include/apdu.h
+                - path: ../../../App/Bacnet/include/arcnet.h
+                - path: ../../../App/Bacnet/include/arf.h
+                - path: ../../../App/Bacnet/include/awf.h
+                - path: ../../../App/Bacnet/include/bacaddr.h
+                - path: ../../../App/Bacnet/include/bacapp.h
+                - path: ../../../App/Bacnet/include/bacdcode.h
+                - path: ../../../App/Bacnet/include/bacdef.h
+                - path: ../../../App/Bacnet/include/bacdevobjpropref.h
+                - path: ../../../App/Bacnet/include/bacenum.h
+                - path: ../../../App/Bacnet/include/bacerror.h
+                - path: ../../../App/Bacnet/include/bacint.h
+                - path: ../../../App/Bacnet/include/bacnet.h
+                - path: ../../../App/Bacnet/include/bacprop.h
+                - path: ../../../App/Bacnet/include/bacpropstates.h
+                - path: ../../../App/Bacnet/include/bacreal.h
+                - path: ../../../App/Bacnet/include/bacstr.h
+                - path: ../../../App/Bacnet/include/bactext.h
+                - path: ../../../App/Bacnet/include/bactimevalue.h
+                - path: ../../../App/Bacnet/include/bigend.h
+                - path: ../../../App/Bacnet/include/bip.h
+                - path: ../../../App/Bacnet/include/bits.h
+                - path: ../../../App/Bacnet/include/bvlc.h
+                - path: ../../../App/Bacnet/include/bytes.h
+                - path: ../../../App/Bacnet/include/calendar.h
+                - path: ../../../App/Bacnet/include/client.h
+                - path: ../../../App/Bacnet/include/config_Original.h
+                - path: ../../../App/Bacnet/include/cov.h
+                - path: ../../../App/Bacnet/include/crc.h
+                - path: ../../../App/Bacnet/include/datetime.h
+                - path: ../../../App/Bacnet/include/dcc.h
+                - path: ../../../App/Bacnet/include/debug.h
+                - path: ../../../App/Bacnet/include/dlenv.h
+                - path: ../../../App/Bacnet/include/dlmstp.h
+                - path: ../../../App/Bacnet/include/ethernet.h
+                - path: ../../../App/Bacnet/include/event.h
+                - path: ../../../App/Bacnet/include/fifo.h
+                - path: ../../../App/Bacnet/include/filename.h
+                - path: ../../../App/Bacnet/include/get_alarm_sum.h
+                - path: ../../../App/Bacnet/include/getevent.h
+                - path: ../../../App/Bacnet/include/handlers.h
+                - path: ../../../App/Bacnet/include/hostnport.h
+                - path: ../../../App/Bacnet/include/iam.h
+                - path: ../../../App/Bacnet/include/ihave.h
+                - path: ../../../App/Bacnet/include/indtext.h
+                - path: ../../../App/Bacnet/include/key.h
+                - path: ../../../App/Bacnet/include/keylist.h
+                - path: ../../../App/Bacnet/include/lso.h
+                - path: ../../../App/Bacnet/include/memcopy.h
+                - path: ../../../App/Bacnet/include/mstp.h
+                - path: ../../../App/Bacnet/include/mstpdef.h
+                - path: ../../../App/Bacnet/include/mstptext.h
+                - path: ../../../App/Bacnet/include/mydata.h
+                - path: ../../../App/Bacnet/include/npdu.h
+                - path: ../../../App/Bacnet/include/objects.h
+                - path: ../../../App/Bacnet/include/proplist.h
+                - path: ../../../App/Bacnet/include/ptransfer.h
+                - path: ../../../App/Bacnet/include/rd.h
+                - path: ../../../App/Bacnet/include/readrange.h
+                - path: ../../../App/Bacnet/include/reject.h
+                - path: ../../../App/Bacnet/include/ringbuf.h
+                - path: ../../../App/Bacnet/include/rp.h
+                - path: ../../../App/Bacnet/include/rpm.h
+                - path: ../../../App/Bacnet/include/sbuf.h
+                - path: ../../../App/Bacnet/include/timestamp.h
+                - path: ../../../App/Bacnet/include/timesync.h
+                - path: ../../../App/Bacnet/include/tsm.h
+                - path: ../../../App/Bacnet/include/txbuf.h
+                - path: ../../../App/Bacnet/include/version.h
+                - path: ../../../App/Bacnet/include/whohas.h
+                - path: ../../../App/Bacnet/include/whois.h
+                - path: ../../../App/Bacnet/include/wp.h
+                - path: ../../../App/Bacnet/include/wpm.h
+              folders: []
+        - name: OTA
+          files:
+            - path: ../../../App/OTA/src/libOTA.a
+            - path: ../../../App/OTA/inc/OTA.h
+          folders: []
+        - name: Automation
+          files:
+            - path: ../../../App/Automation/libAutomationIO.a
+            - path: ../../../App/Automation/UIO.h
+            - path: ../../../App/Automation/AnalogueInput.h
+            - path: ../../../App/Automation/AnalogueOutput.h
+            - path: ../../../App/Automation/AutomationOpts.h
+            - path: ../../../App/Automation/Calibration.h
+            - path: ../../../App/Automation/DigitalInput.h
+            - path: ../../../App/Automation/DigitalOutput.h
+            - path: ../../../App/Automation/PulseAccum.h
+          folders: []
+        - name: FuncBlockFB
+          files:
+            - path: ../../../App/FuncBlockFB/libFuncBlockFB.a
+            - path: ../../../App/FuncBlockFB/flatches.h
+            - path: ../../../App/FuncBlockFB/fmath.h
+            - path: ../../../App/FuncBlockFB/func.h
+            - path: ../../../App/FuncBlockFB/futil.h
+            - path: ../../../App/FuncBlockFB/hostComm.h
+            - path: ../../../App/FuncBlockFB/HVAC.h
+            - path: ../../../App/FuncBlockFB/Logic.h
+            - path: ../../../App/FuncBlockFB/priority.h
+            - path: ../../../App/FuncBlockFB/RegistersExport.h
+            - path: ../../../App/FuncBlockFB/schedule.h
+            - path: ../../../App/FuncBlockFB/timing.h
+            - path: ../../../App/FuncBlockFB/types.h
+          folders: []
+        - name: xlsot
+          files:
+            - path: ../../../App/Xslot/httpserver-netconn.c
+            - path: ../../../App/Xslot/mqtt.c
+            - path: ../../../App/Xslot/mqtt_app.c
+            - path: ../../../App/Xslot/at_passthrough.c
+            - path: ../../../App/Xslot/communication.h
+            - path: ../../../App/Xslot/communication_task.c
+            - path: ../../../App/Xslot/mdns_discovery.c
+          folders: []
+    - name: EKStdLib
+      files:
+        - path: ../../../EKStdLib/src/libEKStdLib.a
+        - path: ../../../EKStdLib/inc/EKUsbCDC.h
+        - path: ../../../EKStdLib/inc/EKUtil.h
+        - path: ../../../EKStdLib/inc/EKFifo.h
+        - path: ../../../EKStdLib/inc/EKI2C.h
+        - path: ../../../EKStdLib/inc/EKLED.h
+        - path: ../../../EKStdLib/inc/EKStdDefs.h
+        - path: ../../../EKStdLib/inc/EKStdErr.h
+        - path: ../../../EKStdLib/inc/EKStdLib.h
+        - path: ../../../EKStdLib/inc/EKStream.h
+        - path: ../../../EKStdLib/inc/EKTimer.h
+        - path: ../../../EKStdLib/inc/EKUart.h
+      folders: []
+    - name: CMSIS
+      files:
+        - path: ${PROJ_DIR}/../../../XC8064/CMSIS/system_gd32f5xx.c
+      folders: []
+    - name: Startup
+      files:
+        - path: ${PROJ_DIR}/../../../XC8064/Startup/startup_gd32f5xx.s
+      folders: []
+    - name: Third_Party
+      files: []
+      folders:
+        - name: FreeRTOS
+          files:
+            - path: ../../../Third_Party/FreeRTOS/include/FreeRTOSConfig.h
+            - path: ../../../Third_Party/FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure/portmacrocommon.h
+          folders:
+            - name: freertos_core
+              files:
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/croutine.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/event_groups.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/list.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/queue.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/stream_buffer.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/tasks.c
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/timers.c
+              folders: []
+            - name: freertos_port
+              files:
+                - path: ${PROJ_DIR}/../../../Third_Party/FreeRTOS/portable/MemMang/heap_4.c
+                - path: ../../../Third_Party/FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure/portasm.c
+                - path: ../../../Third_Party/FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure/port.c
+              folders: []
+        - name: lwip
+          files: []
+          folders:
+            - name: lwip-2.1.2
+              files: []
+              folders:
+                - name: port
+                  files: []
+                  folders:
+                    - name: FreeRTOS
+                      files:
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/port/GD32F5xx/FreeRTOS/ethernetif.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/port/GD32F5xx/FreeRTOS/sys_arch.c
+                      folders: []
+                - name: src
+                  files: []
+                  folders:
+                    - name: api
+                      files:
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/netifapi.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/sockets.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/tcpip.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/api_lib.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/api_msg.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/err.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/if_api.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/netbuf.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/api/netdb.c
+                      folders: []
+                    - name: core
+                      files:
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/tcp_out.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/timeouts.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/udp.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/altcp.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/altcp_alloc.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/altcp_tcp.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/def.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/dns.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/inet_chksum.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/init.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ip.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/mem.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/memp.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/netif.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/pbuf.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/raw.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/stats.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/sys.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/tcp.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/tcp_in.c
+                      folders:
+                        - name: ipv4
+                          files:
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/ip4_addr.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/ip4_frag.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/autoip.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/dhcp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/etharp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/icmp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/igmp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv4/ip4.c
+                          folders: []
+                        - name: ipv6
+                          files:
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/nd6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/dhcp6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/ethip6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/icmp6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/inet6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/ip6.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/ip6_addr.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/ip6_frag.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/core/ipv6/mld6.c
+                          folders: []
+                    - name: netif
+                      files:
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/zepif.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/bridgeif.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/bridgeif_fdb.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ethernet.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/lowpan6.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/lowpan6_ble.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/lowpan6_common.c
+                        - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/slipif.c
+                      folders:
+                        - name: ppp
+                          files:
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/pppoe.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/pppol2tp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/pppos.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/upap.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/utils.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/vj.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/auth.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/chap_ms.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/chap-md5.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/chap-new.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/demand.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/eap.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/ecp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/eui64.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/fsm.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/ipcp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/ipv6cp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/lcp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/magic.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/mppe.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/multilink.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/ppp.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/pppapi.c
+                            - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/pppcrypt.c
+                          folders:
+                            - name: polarssi
+                              files:
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/ccp.c
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/polarssl/sha1.c
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/polarssl/arc4.c
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/polarssl/des.c
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/polarssl/md4.c
+                                - path: ../../../Third_Party/lwip/lwip-2.1.2/src/netif/ppp/polarssl/md5.c
+                              folders: []
+        - name: GD32F
+          files: []
+          folders:
+            - name: GF32F5xx_usb_library
+              files: []
+              folders:
+                - name: config
+                  files:
+                    - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/config/Source/gd32f5xx_hw.c
+                  folders: []
+                - name: device
+                  files: []
+                  folders:
+                    - name: class
+                      files: []
+                      folders:
+                        - name: cdc
+                          files:
+                            - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/cdc/Source/cdc_acm_core.c
+                          folders: []
+                        - name: msc
+                          files:
+                            - path: ../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Source/usbd_storage_msd.c
+                            - path: ../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Source/sram_msd.c
+                            - path: ../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Source/usbd_msc_bbb.c
+                            - path: ../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Source/usbd_msc_core.c
+                            - path: ../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Source/usbd_msc_scsi.c
+                          folders: []
+                    - name: core
+                      files:
+                        - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/core/Source/usbd_core.c
+                        - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/core/Source/usbd_enum.c
+                        - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/core/Source/usbd_transc.c
+                      folders: []
+                - name: driver
+                  files:
+                    - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/driver/Source/drv_usb_core.c
+                    - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/driver/Source/drv_usb_dev.c
+                    - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/driver/Source/drv_usbd_int.c
+                  folders: []
+            - name: GD32F5xx_Firmware_Library_V1.2.0
+              files:
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_adc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_can.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_aes.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_des.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_cau_tdes.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_crc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_ctc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dac.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dbg.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dci.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_dma.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_enet.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_exmc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_exti.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_fmc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_fwdgt.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_gpio.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_hau.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_hau_sha_md5.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_i2c.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_i2c_add.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_ipa.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_iref.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_misc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_pkcau.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_pmu.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_rcu.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_rtc.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_sai.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_sdio.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_spi.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_syscfg.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_timer.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_tli.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_trng.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_usart.c
+                - path: ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Source/gd32f5xx_wwdgt.c
+              folders: []
+            - name: gd32-secure-boot-secure-firmware-update
+              files: []
+              folders:
+                - name: Utilities
+                  files:
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mbedtls-2.17.0/library/platform.c
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mbedtls-2.17.0/library/platform_util.c
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mbedtls-2.17.0/library/memory_buffer_alloc.c
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/bootutil/src/bootutil_public.c
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice/flash_hal/flash_map.c
+                    - path: ../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice/flash_hal/boot_hal.c
+                  folders: []
+    - name: Driver
+      files:
+        - path: ../../../Driver/src/libDriver.a
+        - path: ../../../Driver/inc/dev_w25q128.h
+        - path: ../../../Driver/inc/dev_dac.h
+        - path: ../../../Driver/inc/MyDevice.h
+        - path: ../../../Driver/inc/dev_uart.h
+        - path: ../../../Driver/inc/dev_flash.h
+        - path: ../../../Driver/inc/dev_uio.h
+        - path: ../../../Driver/inc/dev_led.h
+        - path: ../../../Driver/inc/dev_PulseAccumTimer.h
+        - path: ../../../Driver/inc/dev_ssi.h
+        - path: ../../../Driver/inc/dev_sn74595.h
+        - path: ../../../Driver/inc/dev_pwm.h
+        - path: ../../../Driver/inc/dev_gpio.h
+        - path: ../../../Driver/inc/EKDataType.h
+        - path: ../../../Driver/inc/dev_sdram.h
+        - path: ../../../Driver/inc/dev_ms5262d.h
+        - path: ../../../Driver/inc/dev_softi2c.h
+        - path: ../../../Driver/inc/dev_do.h
+        - path: ../../../Driver/inc/dev_di.h
+        - path: ../../../Driver/inc/dev_util.h
+        - path: ../../../Driver/inc/dev_svc.h
+        - path: ../../../Driver/inc/dev_usbd.h
+        - path: ../../../Driver/inc/dev_systick.h
+        - path: ../../../Driver/inc/dev_stream.h
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: e128b7c42fd68e5e3f6830ac46926d92
+targets:
+  Debug:
+    cppPreprocessAttrs:
+      defineList:
+        - GD32F527
+        - USE_STDPERIPH_DRIVER
+        - USE_USB_FS
+        - ewarm
+        - PLATFORM_GD32F5XX
+      incList:
+        - ${PROJ_DIR}/../../../Third_Party/FreeRTOS/include
+        - ${PROJ_DIR}/../../../Third_Party/FreeRTOS/portable/GCC/ARM_CM33_NTZ/non_secure
+        - ${PROJ_DIR}/../../../Driver/inc
+        - ${PROJ_DIR}/../../../EKStdLib/inc
+        - ${PROJ_DIR}/../../../App/Automation
+        - ${PROJ_DIR}/../../../App
+        - ${PROJ_DIR}/../../../App/inc
+        - ${PROJ_DIR}/../../../XC8064/CMSIS
+        - ${PROJ_DIR}/../../../App/Startup
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_Firmware_Library_V1.2.0/Firmware/GD32F5xx_standard_peripheral/Include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/driver/Include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/cdc/Include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/core/Include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/config/Include
+        - ${PROJ_DIR}/../../../App/Modbus/inc
+        - ${PROJ_DIR}/../../../Third_Party/lwip/lwip-2.1.2/port/GD32F5xx
+        - ${PROJ_DIR}/../../../Third_Party/lwip/lwip-2.1.2/port/GD32F5xx/FreeRTOS
+        - ${PROJ_DIR}/../../../Third_Party/lwip/lwip-2.1.2/src/include
+        - ${PROJ_DIR}/../../../Third_Party/lwip/lwip-2.1.2/src/include/lwip
+        - ${PROJ_DIR}/../../../App/lwip
+        - ${PROJ_DIR}/../../../Third_Party/lwip/lwip-2.1.2/port/GD32F5xx/arch
+        - ${PROJ_DIR}/../../../App/Bacnet/BACnetApp
+        - ${PROJ_DIR}/../../../App/Bacnet/include
+        - ${PROJ_DIR}/../../../App/Bacnet/Object
+        - ${PROJ_DIR}/../../../App/FuncBlockFB
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/device/class/msc/Include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/GD32F5xx_usb_library/ustd/class/msc
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/bootutil/include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mbedtls-2.17.0/include
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice
+        - ${PROJ_DIR}/../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Utilities/Third_Party/mcuboot-main/boot/gigadevice/include
+        - ${PROJ_DIR}/../../../App/OTA/inc
+      libList:
+        - ../../../Driver/src
+        - ../../../EKStdLib/src
+        - ../../../App/src
+        - ../../../App/Automation
+        - ../../../App/Bacnet
+        - ../../../App/FuncBlockFB
+        - ../../../App/lwip
+        - ../../../App/Modbus/src
+        - ../../../App/OTA/src
+    excludeList:
+      - <virtual_root>/board/WATCHDOGCfg.c
+      - <virtual_root>/GD32F/dev_adc.c
+      - <virtual_root>/GD32F/dev_enet.c
+      - <virtual_root>/GD32F/dev_softspi.c
+      - <virtual_root>/mekiLib/meki_wwtdg.c
+      - <virtual_root>/mekiLib/mekiTimer.c
+      - <virtual_root>/FreeRTOS/freertos_port/portasm.s
+      - <virtual_root>/FreeRTOS/freertos_port/mpu_wrappers_v2_asm.S
+      - <virtual_root>/GD32F/dev_ao.c
+      - <virtual_root>/GD32F/dev_ai.c
+      - ../../../lwip/lwip-2.1.2/port/GD32F5xx/Basic
+      - ../../../lwip/lwip-2.1.2/doc
+      - ../../../lwip/lwip-2.1.2/test
+      - <virtual_root>/board/KEYCfg.c
+      - <virtual_root>/board/LEDCfg.c
+      - <virtual_root>/board/mekiInit.c
+      - <virtual_root>/board/RTCCfg.c
+      - <virtual_root>/board/UARTCfg.c
+      - <virtual_root>/GD32F/dev_spiflash.c
+      - <virtual_root>/App/lwip/phy.c
+      - <virtual_root>/App/BACnet/Object/TotaliserObj.c
+      - <virtual_root>/App/BACnet/Object/tempTable.c
+      - <virtual_root>/mekiLib/meki_RTC.c
+      - <virtual_root>/mekiLib/mekiKEY.c
+      - <virtual_root>/mekiLib/mekiUart.c
+      - <virtual_root>/mekiLib/mekiUsbCDC.c
+      - <virtual_root>/mekiLib/mekiLED.c
+      - <virtual_root>/mekiLib
+      - ../../../lwip/lwip-2.1.2/src/apps
+      - <virtual_root>/FuncBlockFB/extComm.c
+      - <virtual_root>/FuncBlockFB/ModbusSlave.c
+      - <virtual_root>/FuncBlockFB/a2d.c
+      - <virtual_root>/FuncBlockFB/p2p.c
+      - <virtual_root>/GD32F/dev_pga116.c
+      - <virtual_root>/App/FatFS/diskio.c
+      - <virtual_root>/App/FatFS/ff.c
+      - <virtual_root>/App/FatFS/eeprom_emul.c
+      - <virtual_root>/App/FatFS/flash_interface.c
+      - <virtual_root>/App/eeprom.c
+      - <virtual_root>/board
+      - <virtual_root>/App/OTA/Common/ymodem_update.c
+      - <virtual_root>/App/OTA/Common/task.c
+      - <virtual_root>/App/OTA/Common/reboot.c
+      - <virtual_root>/App/OTA/Common
+      - <virtual_root>/App/OTA/lib
+      - <virtual_root>/App/OTA/Letter_shell
+      - <virtual_root>/EKStdLib/src/EKOTA.c
+      - <virtual_root>/EKStdLib/src/fmc_operation.c
+      - <virtual_root>/App/httpserver-netconn.c
+      - <virtual_root>/App/mqtt_app.c
+      - <virtual_root>/App/mqtt.c
+    toolchain: GCC
+    toolchainConfigMap:
+      GCC:
+        archExtensions: ""
+        cpuType: Cortex-M33
+        floatingPointHardware: single
+        options:
+          version: 5
+          afterBuildTasks:
+            - name: python ..\..\..\afterbuild.py false（download used）
+              abortAfterFailed: true
+              command: python "./../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Project/afterbuild.py" project_deal -enc False -pn APP -op "${OutDir}/" -on "${PROJ_NAME}" -ide GCC -ip "${workspaceFolder}"
+              disable: false
+            - name: python "./../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Project/afterbuild.py" project_deal -enc False -pn APP -op "${OutDir}/" -on "XC8064" -ide GCC -ip "${ToolchainRoot}/arm-none-eab/bin"
+              abortAfterFailed: true
+              command: python "./../../../Third_Party/GD32F/gd32-secure-boot-secure-firmware-update/Project/afterbuild.py" project_deal -enc True -pn APP -op "${OutDir}/" -on "XC8064" -ide GCC -ip "${ToolchainRoot}/arm-none-eab/bin"
+              disable: true
+          asm-compiler: {}
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            C_FLAGS: -Wno-format -Wno-address-of-packed-member -Wno-address -Wno-char-subscripts
+            language-c: c99
+            language-cpp: c++11
+            one-elf-section-per-data: true
+            one-elf-section-per-function: true
+            optimization: level-0
+            warnings: all-warnings
+          global:
+            $float-abi-type: softfp
+            arm-thumb-mode: thumb
+            misc-control: --specs=nosys.specs --specs=nano.specs
+            output-debug-info: enable
+          linker:
+            $toolName: auto
+            LIB_FLAGS: -lm -specs=rdimon.specs -lc -lrdimon -Wl,--start-group -lDriver -lEKStdLib -lBACnet -lAutoMationIO -lFuncBlockFB -lLWIP -lModbus -lOTA -lApp -Wl,--end-group
+            output-format: elf
+            remove-unused-input-sections: true
+        scatterFilePath: ..\gd32f5xx_flash.ld
+        storageLayout:
+          RAM: []
+          ROM: []
+        useCustomScatterFile: true
+    uploadConfigMap:
+      JLink:
+        baseAddr: ""
+        bin: ""
+        cpuInfo:
+          cpuName: GD32F527ZM
+          vendor: GigaDevice
+        otherCmds: ""
+        proType: 1
+        speed: 4000
+    uploader: JLink
+  Release:
+    cppPreprocessAttrs:
+      defineList:
+        - ewarm
+        - NDEBUG
+        - GD32F407
+        - USE_HAL_DRIVER
+        - XC8064
+      incList:
+        - ${PROJ_DIR}/../../../GD32F
+        - ${PROJ_DIR}/../../../GD32F/GD32F4xx_Firmware_Library_V2.1.3/Firmware/CMSIS/GD/GD32F4xx/Include
+        - ${PROJ_DIR}/../../../GD32F/GD32F4xx_Firmware_Library_V2.1.3/Firmware/GD32F4xx_standard_peripheral/Include
+        - ${PROJ_DIR}/../../../EKStdLib/inc
+        - ${PROJ_DIR}/../../../App/Automation
+        - ${PROJ_DIR}/../../../ModbusV2
+        - ${PROJ_DIR}/../../../Bacnet
+        - ${PROJ_DIR}/../../../Bacnet/include
+        - ${PROJ_DIR}/../../../App/inc
+        - ${PROJ_DIR}/../../../App/Modbus/inc
+        - ${PROJ_DIR}/../../../App/Bacnet
+        - ${PROJ_DIR}/../../../App/Bacnet/Object
+        - ${PROJ_DIR}/../../../XC8064/CMSIS
+        - ${PROJ_DIR}/../../../App/Startup
+        - ${PROJ_DIR}/../../../../FuncBlock
+      libList: []
+    excludeList: []
+    toolchain: IAR_ARM
+    toolchainConfigMap:
+      IAR_ARM:
+        cpuType: Cortex-M4
+        floatingPointHardware: none
+        options:
+          version: 1
+          afterBuildTasks: []
+          asm-compiler:
+            case-sensitive-user-symbols: true
+            defines: []
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            destroy-cpp-static-object: true
+            floating-point-semantics: strict
+            language-c: c99
+            language-conformance: IAR-extensions
+            misc-controls: ""
+            optimization: none
+            use-cpp-inline-semantics: true
+          global:
+            endian-mode: little
+            output-debug-info: enable
+            printf-formatter: auto
+            runtime-lib: normal
+            scanf-formatter: auto
+          linker:
+            LIB_FLAGS: []
+            auto-search-runtime-lib: true
+            config-defines: []
+            misc-controls: --keep __checksum
+            output-format: elf
+            perform-cpp-virtual-func-elimination: disable
+        scatterFilePath: ${PROJ_DIR}/../GD32F407xE_flash.icf
+        storageLayout:
+          RAM: []
+          ROM: []
+        useCustomScatterFile: true
+    uploadConfigMap:
+      JLink:
+        baseAddr: ""
+        bin: ""
+        cpuInfo:
+          cpuName: "null"
+          vendor: "null"
+        otherCmds: ""
+        proType: 1
+        speed: 8000
+    uploader: JLink

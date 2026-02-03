@@ -1,0 +1,19 @@
+#ifndef __MODBUSOPTS_H_08E53B9C_92A4_429a_A592_963B21B0CBB9
+#define __MODBUSOPTS_H_08E53B9C_92A4_429a_A592_963B21B0CBB9
+
+
+///define IO Modbus holding register start address
+#define MODBUSHOLDINGINPUTREGSSTARTADDR    40000
+
+///define IO Modbus total registers
+#define TOTALDISCRETEINPUTREGS		        30
+#define TOTALDISCRETEINPUTPOINTERS	        23
+#define TOTALCOILOUTPUTREGS			        120
+#define TOTALCOILOUTPUTPOINTERS		        71
+#define TOTALINPUTREGS			            124
+#define TOTALHOLDINGREGS			        317
+
+#define MODBUS_SERIAL       1
+#define MODBUS_TCP          0
+
+#endif	/* end of __MODBUSOPTS_H_08E53B9C_92A4_429a_A592_963B21B0CBB9 */

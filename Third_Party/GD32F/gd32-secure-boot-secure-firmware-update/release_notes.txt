@@ -1,0 +1,23 @@
+==========================================
+Release Notes
+==========================================
+
+==========================================
+V1.0.0 (2024-10-10)
+1. First release.
+2. Keil complier is used 6.16.
+
+==========================================
+V1.0.0 (2024-11-10)
+1. ibl_flash.c change, fmc_flag_clear only one parameter can be selected once.
+2. ymodem_packet_deal change, after the last packet of data in ymodem, the obtained data is no longer written into flash.
+3. ibl_flash.c change in flash_write function, for GD32A513 and GD32G5x3 forcing an odd address to uint64_t * can result in misaligned access issues.
+
+==========================================
+V1.0.0 (2025-01-10)
+1. ibl_boot.c change in delay_us function, fix the issue where a random delay time of 0 would cause an infinite loop.
+2. ibl.c add ibl_rw_data_init function, initializing RW data which initial value is non-zero.
+
+==========================================
+V1.0.0 (2025-03-10)
+1. ymodem.c change, correct the error in obtaining the CRC bit when the packet length is 128 bytes..
