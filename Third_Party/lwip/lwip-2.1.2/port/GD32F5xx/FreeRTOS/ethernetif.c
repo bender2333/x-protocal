@@ -45,6 +45,7 @@
 #include "netif/etharp.h"
 #include "err.h"
 #include "ethernetif.h"
+#include "x_protocol/tpmesh_init.h"
 
 #include "gd32f5xx_enet.h"
 #include <string.h>
@@ -294,23 +295,23 @@ void ethernetif_input(void *pvParameters)
     struct pbuf *p;
     SYS_ARCH_DECL_PROTECT(sr);
 
-//    for (;;) {
-//        if (pdTRUE == xSemaphoreTake(g_rx_semaphore, LOWLEVEL_INPUT_WAITING_TIME)) {
-//        TRY_GET_NEXT_FRAME:
-            SYS_ARCH_PROTECT(sr);
-            p = low_level_input(low_netif);
-            SYS_ARCH_UNPROTECT(sr);
+    SYS_ARCH_PROTECT(sr);
+    p = low_level_input(low_netif);
+    SYS_ARCH_UNPROTECT(sr);
 
-            if (p != NULL) {
-                if (ERR_OK != low_netif->input(p, low_netif)) {
-                    pbuf_free(p);
-                } else {
-//                    goto TRY_GET_NEXT_FRAME;
-                }
-            }
-//            vTaskDelay(10);
-//        }
-//    }
+    if (p != NULL) {
+        /* TPMesh 桥接钩子: 检查是否需要转发到 Mesh */
+        if (tpmesh_eth_input_hook(low_netif, p)) {
+            /* 帧已被 TPMesh 处理 (转发到 Mesh 或代理 ARP) */
+            pbuf_free(p);
+            return;
+        }
+        
+        /* 交给 LwIP 本地处理 */
+        if (ERR_OK != low_netif->input(p, low_netif)) {
+            pbuf_free(p);
+        }
+    }
 }
 
 /**
@@ -344,4 +345,13 @@ err_t ethernetif_init(struct netif *netif)
     low_level_init(netif);
 
     return ERR_OK;
+}
+
+/**
+ * @brief 获取以太网 netif 指针 (供 TPMesh 模块使用)
+ * @return netif 指针
+ */
+struct netif* ethernetif_get_netif(void)
+{
+    return low_netif;
 }

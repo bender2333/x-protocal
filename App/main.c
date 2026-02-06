@@ -1,5 +1,9 @@
 #include "App.h"
 #include "Xslot/communication.h"
+#include "ethernetif.h"
+#include "x_protocol/tpmesh_debug.h"
+#include "x_protocol/tpmesh_init.h"
+
 void start_task(void);
 TaskHandle_t LED_Handler;
 
@@ -129,7 +133,7 @@ void TestOnRx(u8_t bStatus, u8_t ch) {
 void uartTestTask(void *pvParameters) {
   (void)(pvParameters);
   UART_CONFIG sCfg;
-  // s32_t index = 9;
+  s32_t index = 9;
   sCfg.nBaud = 19200;
   sCfg.nControl = HALFDUPLEX | EIGHTBIT | PARITY_NONE;
 
@@ -138,11 +142,10 @@ void uartTestTask(void *pvParameters) {
   SetCommCallBack(m_UART6, (UARTCALLBACK *)TestOnRx);
 
   while (1) {
-    //   EKfwrite(m_UART6, (LPSTR) test_tx_buffer, index, &index, 1000);
-    //   vTaskDelay(10000);
+    EKfwrite(m_UART6, (LPSTR)test_tx_buffer, index, &index, 1000);
+    vTaskDelay(10000);
   }
 }
-
 
 void test_spi_task(void *pvParameters) {
   (void)(pvParameters);
@@ -283,8 +286,29 @@ int main(void) {
   dev_svc_init();
   RTCInit();
   CommMonInit();
+
+  /* 初始化调试输出 (printf -> USART2) */
+  tpmesh_debug_init();
+
   WatchDogToggle();
   EnetInit(false);
+
+  /* TPMesh 桥接初始化
+   * TPMESH_MODE: 0=禁用, 1=Top Node, 2=DDC
+   */
+#if (TPMESH_MODE == TPMESH_MODE_TOP_NODE)
+  {
+    struct netif *eth_netif = ethernetif_get_netif();
+    if (eth_netif != NULL) {
+      tpmesh_module_init_top(eth_netif);
+    }
+  }
+#elif (TPMESH_MODE == TPMESH_MODE_DDC)
+  tpmesh_module_init_ddc();
+#else
+  /* TPMESH_MODE_DISABLED: 正常以太网模式, 不初始化 TPMesh */
+#endif
+
   ModbusTCPInit();
   BacnetAppInit();
   LEDSet(LED_STATUS_NORMAL);
@@ -320,6 +344,11 @@ int main(void) {
   /* MQTT 客户端任务 - 在调度器启动后执行初始化 */
   // xTaskCreate(mqtt_client_task, "mqtt_client", 0x800, NULL,
   //             tskIDLE_PRIORITY + 1, NULL);
+
+  /* TPMesh 桥接任务 */
+  if (tpmesh_is_initialized()) {
+    tpmesh_create_tasks();
+  }
 
   vTaskStartScheduler();
 }

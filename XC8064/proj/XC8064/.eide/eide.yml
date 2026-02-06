@@ -214,6 +214,21 @@ virtualFolder:
             - path: ../../../App/Xslot/communication_task.c
             - path: ../../../App/Xslot/mdns_discovery.c
           folders: []
+        - name: x_protocal
+          files:
+            - path: ../../../App/x_protocol/node_table.c
+            - path: ../../../App/x_protocol/node_table.h
+            - path: ../../../App/x_protocol/tpmesh_at.c
+            - path: ../../../App/x_protocol/tpmesh_at.h
+            - path: ../../../App/x_protocol/tpmesh_bridge.c
+            - path: ../../../App/x_protocol/tpmesh_bridge.h
+            - path: ../../../App/x_protocol/tpmesh_init.c
+            - path: ../../../App/x_protocol/tpmesh_init.h
+            - path: ../../../App/x_protocol/tpmesh_schc.c
+            - path: ../../../App/x_protocol/tpmesh_schc.h
+            - path: ../../../App/x_protocol/tpmesh_debug.c
+            - path: ../../../App/x_protocol/tpmesh_uart.c
+          folders: []
     - name: EKStdLib
       files:
         - path: ../../../EKStdLib/src/libEKStdLib.a

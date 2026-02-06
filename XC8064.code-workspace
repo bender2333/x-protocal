@@ -124,7 +124,9 @@
             "modbusclient.h": "c",
             "timing.h": "c",
             "api.h": "c",
-            "tcpip.h": "c"
+            "tcpip.h": "c",
+            "mem.h": "c",
+            "tpmesh_at.h": "c"
         },
         "cortex-debug.variableUseNaturalFormat": false
     }

@@ -111,8 +111,32 @@ void FPU_IRQHandler(void)
     \param[out] none
     \retval     none
 */
+/* 简易 HardFault 调试输出 (轮询方式, 不依赖中断) */
+static void hardfault_putc(char ch) {
+    while ((USART_STAT0(USART2) & USART_STAT0_TBE) == 0);
+    USART_DATA(USART2) = ch;
+}
+static void hardfault_puts(const char *s) {
+    while (*s) hardfault_putc(*s++);
+}
+
 void HardFault_Handler(void)
 {
+    /* 尝试输出调试信息 */
+    hardfault_puts("\r\n!!! HARDFAULT !!!\r\n");
+    
+    /* 获取故障地址 (如果可用) */
+    volatile uint32_t *sp;
+    __asm volatile ("mrs %0, msp" : "=r" (sp));
+    
+    /* 尝试打印 PC 值 */
+    hardfault_puts("SP: 0x");
+    for (int i = 7; i >= 0; i--) {
+        uint8_t nib = ((uint32_t)sp >> (i * 4)) & 0xF;
+        hardfault_putc(nib < 10 ? '0' + nib : 'A' + nib - 10);
+    }
+    hardfault_puts("\r\n");
+    
     /* if Hard Fault exception occurs, go to infinite loop */
     while (1) {
     }
@@ -259,16 +283,18 @@ void USART5_IRQHandler(void)
   dev_uart_isr5();
 }
 
-void dev_uart_isr2();
+/* TPMesh 调试输出使用 USART2 */
+extern void tpmesh_debug_irq_handler(void);
 void USART2_IRQHandler(void)
 {
-  dev_uart_isr2();
+  tpmesh_debug_irq_handler();
 }
 
-void dev_uart_isr6();
+/* TPMesh AT 命令使用 UART6 (中断RX) */
+extern void tpmesh_uart6_irq_handler(void);
 void UART6_IRQHandler(void)
 {
-  dev_uart_isr6();
+  tpmesh_uart6_irq_handler();
 }
 
 
