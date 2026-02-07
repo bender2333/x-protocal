@@ -2071,3 +2071,27 @@ int tpmesh_send_transparent_with_busy(uint16_t dest, const uint8_t *data, uint16
 | V0.5 | 2026-02-03 | MAC 与 Mesh ID 解耦；节点映射表 |
 | V0.6 | 2026-02-03 | DDC 主动注册 + 重传状态机；Top Node 代答 ARP + GARP；透传模式2；SCHC 压缩；广播限速；FreeRTOS 任务架构；模组流控 |
 | V0.6.1 | 2026-02-03 | 补充 BACnet Who-Is/I-Am 完整数据流程；DDC 广播帧处理；Top Node 转发 DDC 广播帧；Top Node 代答 DDC 的 ARP 请求 |
+
+---
+
+## 10. V0.8 Supplement (UART6 Takeover)
+
+For deployments where another module configures TPMesh via UART6, architecture supplement is documented in:
+
+- `App/x_protocol/UART6_TAKEOVER_MODE.md`
+
+Key points:
+
+- x_protocol can skip module init AT sequence in external-config mode.
+- external module can request UART6 handover before configuring TPMesh.
+- after external configuration, restart service/device to relaunch x_protocol cleanly.
+
+---
+
+## 11. Build Linker Permission Note (2026-02-07)
+
+- Toolchain `arm-none-eabi-gcc 14.3.1` can emit:
+  `ld.exe: ... has a LOAD segment with RWX permissions`.
+- Root cause in this project: `.init_array/.fini_array` ended up in the same executable `FLASH` load segment and kept writable flags in ELF metadata.
+- Mitigation: in linker script `XC8064/proj/gd32f5xx_flash.ld`, split FLASH load segments with explicit `PHDRS` (`text` vs `ro`) and keep `.preinit_array/.init_array/.fini_array` in the non-executable `ro` segment.
+- Scope: this only changes ELF segment permission metadata (remove RWX warning); runtime memory layout and startup flow stay unchanged.
