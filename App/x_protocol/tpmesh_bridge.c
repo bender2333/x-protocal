@@ -71,16 +71,16 @@ static ddc_config_t s_ddc_config;
 static bool s_is_top_node = false;
 
 /** DDC 状态 */
-static ddc_state_t s_ddc_state = DDC_STATE_INIT;
+static volatile ddc_state_t s_ddc_state = DDC_STATE_INIT;
 
 /** 注册重试计数 */
-static uint8_t s_register_retry_count = 0;
+static volatile uint8_t s_register_retry_count = 0;
 
 /** 注册最后时间 */
-static uint32_t s_last_register_tick = 0;
+static volatile uint32_t s_last_register_tick = 0;
 
 /** 心跳最后时间 */
-static uint32_t s_last_heartbeat_tick = 0;
+static volatile uint32_t s_last_heartbeat_tick = 0;
 
 /** 广播限速器 */
 static rate_limiter_t s_rate_limiter = {0, 0};
@@ -449,7 +449,8 @@ void ddc_heartbeat_task(void *arg) {
 
     case DDC_STATE_REGISTERING:
       /* 注册重试 */
-      if (now - s_last_register_tick > TPMESH_REGISTER_RETRY_MS) {
+      if (s_last_register_tick == 0 ||
+          (now - s_last_register_tick > TPMESH_REGISTER_RETRY_MS)) {
         if (s_register_retry_count < TPMESH_REGISTER_MAX_RETRIES) {
           ddc_send_register(&s_ddc_config);
           s_last_register_tick = now;
@@ -556,14 +557,24 @@ static void mesh_data_callback(uint16_t src_mesh_id, const uint8_t *data,
     msg.src_mesh_id = src_mesh_id;
     msg.len = (len > TPMESH_MTU) ? TPMESH_MTU : len;
     memcpy(msg.data, data, msg.len);
-    xQueueSend(s_mesh_msg_queue, &msg, 0);
+    if (xQueueSend(s_mesh_msg_queue, &msg, 0) != pdTRUE) {
+      tpmesh_debug_printf(
+          "TPMesh: mesh msg queue full, drop src=0x%04X len=%u\n", src_mesh_id,
+          msg.len);
+    }
   }
 }
 
 static void route_event_callback(const char *event, uint16_t addr) {
-  tpmesh_debug_printf("TPMesh Route: %s 0x%04X\n", event, addr);
+  const char *ev = event;
+  if (ev == NULL) {
+    return;
+  }
+  while (*ev == ' ') ev++;
 
-  if (!s_is_top_node && strncmp(event, "CREATE", 6) == 0 &&
+  tpmesh_debug_printf("TPMesh Route: %s 0x%04X\n", ev, addr);
+
+  if (!s_is_top_node && strncmp(ev, "CREATE", 6) == 0 &&
       addr == MESH_ADDR_TOP_NODE) {
     /* DDC 发现 Top Node,开始注册 */
     tpmesh_debug_printf("TPMesh DDC: Top Node discovered, start registering\n");
@@ -768,7 +779,11 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
 
       if (frame->frame_type == REG_FRAME_REGISTER) {
         /* 注册: 添加到节点表 */
-        node_table_register(frame->mac, &ip, src_mesh_id);
+        if (node_table_register(frame->mac, &ip, src_mesh_id) != 0) {
+          tpmesh_debug_printf("TPMesh Top: register table update failed src=0x%04X\n",
+                              src_mesh_id);
+          break;
+        }
 
         /* 发送 GARP */
         send_garp(frame->mac, &ip);
@@ -786,7 +801,11 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         buf[1] = 0x80;
         buf[2] = SCHC_RULE_REGISTER;
         memcpy(buf + 3, &ack, sizeof(ack));
-        tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack));
+        if (tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack)) != 0) {
+          tpmesh_debug_printf("TPMesh Top: register ACK send failed dst=0x%04X\n",
+                              src_mesh_id);
+          break;
+        }
 
         tpmesh_debug_printf("TPMesh Top: DDC 0x%04X registered\n", src_mesh_id);
       } else {
@@ -806,7 +825,10 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         buf[1] = 0x80;
         buf[2] = SCHC_RULE_REGISTER;
         memcpy(buf + 3, &ack, sizeof(ack));
-        tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack));
+        if (tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack)) != 0) {
+          tpmesh_debug_printf("TPMesh Top: heartbeat ACK send failed dst=0x%04X\n",
+                              src_mesh_id);
+        }
       }
       break;
     }
@@ -817,12 +839,21 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
     /* DDC 处理 ACK */
     switch (frame->frame_type) {
     case REG_FRAME_REGISTER_ACK:
+      if (src_mesh_id != MESH_ADDR_TOP_NODE) {
+        tpmesh_debug_printf("TPMesh DDC: Ignore register ACK from 0x%04X\n",
+                            src_mesh_id);
+        break;
+      }
       tpmesh_debug_printf("TPMesh DDC: Register ACK received\n");
       s_ddc_state = DDC_STATE_ONLINE;
       s_last_heartbeat_tick = tpmesh_get_tick_ms();
       break;
 
     case REG_FRAME_HEARTBEAT_ACK:
+      if (src_mesh_id != MESH_ADDR_TOP_NODE) {
+        tpmesh_debug_printf("TPMesh DDC: Ignore heartbeat ACK from 0x%04X\n",
+                            src_mesh_id);
+      }
       /* 心跳确认,无需特殊处理 */
       break;
 

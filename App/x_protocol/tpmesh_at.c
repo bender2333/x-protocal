@@ -31,6 +31,7 @@
 #include "semphr.h"
 #include "task.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -325,8 +326,11 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
     return -3;
   }
 
-  /* 设置功耗模式 */
-  snprintf(cmd, sizeof(cmd), "AT+LP=%u", (unsigned)TPMESH_AT_LP_DEFAULT);
+  /* 设置功耗模式 (Top=TypeD 常接收, DDC=TypeC 低功耗) */
+  {
+    uint8_t lp = is_top_node ? TPMESH_AT_LP_TOP_DEFAULT : TPMESH_AT_LP_DDC_DEFAULT;
+    snprintf(cmd, sizeof(cmd), "AT+LP=%u", (unsigned)lp);
+  }
   r = tpmesh_at_cmd(cmd, TPMESH_AT_TIMEOUT_MS);
   if (r != AT_RESP_OK) {
     tpmesh_debug_printf("Module: LP failed\n");
@@ -515,6 +519,7 @@ static void dispatch_line(const char *line) {
   /* ---- +ROUTE: 路由 URC ---- */
   if (strncmp(line, "+ROUTE:", 7) == 0) {
     const char *p = line + 7; /* 指向 "CREATE ADDR[0xFFFE]" 的开头 */
+    while (*p == ' ') p++;    /* 兼容 "+ROUTE: CREATE ..." */
 
     /* 1. 增大缓冲区，防止越界 (25字节对于包含地址的完整长串可能比较紧凑) */
     char event[64] = {0};
@@ -528,9 +533,21 @@ static void dispatch_line(const char *line) {
     /* 我们直接在 event 字符串内部查找 "ADDR[" */
     char *addr_start = strstr(event, "ADDR[");
     if (addr_start != NULL) {
-      /* 跳过 "ADDR[" (5个字符)，指向 "0xFFFE]" */
-      /* strtol 会自动处理 0x 前缀并在遇到非法字符 ']' 时停止 */
-      addr = (uint16_t)strtol(addr_start + 5, NULL, 16);
+      const char *q = addr_start + 5; /* 跳过 "ADDR[" */
+      char hex_buf[9];
+      uint8_t hex_len = 0;
+
+      while (*q != '\0' && *q != ']' && hex_len < sizeof(hex_buf) - 1) {
+        if (isxdigit((unsigned char)*q)) {
+          hex_buf[hex_len++] = *q;
+        }
+        q++;
+      }
+
+      if (hex_len > 0) {
+        hex_buf[hex_len] = '\0';
+        addr = (uint16_t)strtoul(hex_buf, NULL, 16);
+      }
     }
 
     /* 4. 回调: 此时 event 是全长字符串，addr 是解析出的整数 */

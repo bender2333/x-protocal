@@ -55,13 +55,19 @@ extern "C" {
 #define TPMESH_BROADCAST_BURST_MAX 3
 
 /** AT命令最大长度 */
-#define TPMESH_AT_CMD_MAX_LEN 512
+#ifndef TPMESH_AT_CMD_MAX_LEN
+#define TPMESH_AT_CMD_MAX_LEN 600
+#endif
 
 /** AT响应最大长度 */
+#ifndef TPMESH_AT_RESP_MAX_LEN
 #define TPMESH_AT_RESP_MAX_LEN 512
+#endif
 
 /** Mesh数据最大长度 (AT+SEND MTU) */
+#ifndef TPMESH_MTU
 #define TPMESH_MTU 200
+#endif
 
 /** 隧道头部长度 (L2_HDR + FRAG_HDR + Rule) */
 #define TPMESH_TUNNEL_HDR_LEN 3

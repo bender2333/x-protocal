@@ -50,9 +50,14 @@ extern "C" {
 #define TPMESH_AT_SEND_TYPE_DEFAULT 0
 #endif
 
-/** 默认功耗模式 LP */
-#ifndef TPMESH_AT_LP_DEFAULT
-#define TPMESH_AT_LP_DEFAULT 0
+/** Top Node 默认功耗模式 LP (Type D, 常接收) */
+#ifndef TPMESH_AT_LP_TOP_DEFAULT
+#define TPMESH_AT_LP_TOP_DEFAULT 3
+#endif
+
+/** DDC 默认功耗模式 LP (Type C, 低功耗) */
+#ifndef TPMESH_AT_LP_DDC_DEFAULT
+#define TPMESH_AT_LP_DDC_DEFAULT 2
 #endif
 
 /** AT+SEND 后最大有效载荷 */
@@ -197,7 +202,7 @@ void tpmesh_at_set_route_cb(tpmesh_route_cb_t cb);
  * 发送: AT -> AT+ADDR -> AT+CELL -> AT+LP
  *
  * @param mesh_id 本机 Mesh ID
- * @param is_top_node 节点角色信息(当前仅用于日志)
+ * @param is_top_node 节点角色信息 (true=Top, false=DDC, 用于 LP 配置)
  * @return 0=成功, <0=失败(-1=AT,-2=ADDR,-3=CELL,-4=LP)
  */
 int tpmesh_module_init(uint16_t mesh_id, bool is_top_node);
