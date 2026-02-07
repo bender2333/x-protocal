@@ -134,6 +134,23 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p);
 bool tpmesh_is_initialized(void);
 
 /**
+ * @brief 请求 x_protocol 释放 UART6，供外部模块接管配置
+ */
+void tpmesh_request_uart6_takeover(void);
+
+/**
+ * @brief 非重启场景下，重新由 x_protocol 接管 UART6
+ * @return 0=成功
+ */
+int tpmesh_reclaim_uart6_for_tpmesh(void);
+
+/**
+ * @brief 查询 UART6 是否处于外部接管状态
+ * @return true=已外部接管
+ */
+bool tpmesh_is_uart6_taken_over(void);
+
+/**
  * @brief 打印 TPMesh 状态 (调试用)
  */
 void tpmesh_print_status(void);

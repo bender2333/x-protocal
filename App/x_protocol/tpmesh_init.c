@@ -30,6 +30,7 @@ static bool s_tpmesh_initialized = false;
 
 /** 是否为 Top Node */
 static bool s_is_top_node = false;
+static bool s_uart6_taken_over = false;
 
 /** 任务句柄 */
 static TaskHandle_t s_at_rx_task_handle = NULL;
@@ -78,6 +79,7 @@ int tpmesh_module_init_top(struct netif *eth_netif) {
 
   s_is_top_node = true;
   s_tpmesh_initialized = true;
+  s_uart6_taken_over = false;
 
   tpmesh_debug_printf(
       "TPMesh Init: Top Node HW init done (AT cmds deferred to task)\n");
@@ -163,6 +165,7 @@ int tpmesh_module_init_ddc(void) {
 
   s_is_top_node = false;
   s_tpmesh_initialized = true;
+  s_uart6_taken_over = false;
 
   tpmesh_debug_printf(
       "TPMesh Init: DDC HW init done (AT cmds deferred to task)\n");
@@ -194,7 +197,12 @@ void tpmesh_create_tasks(void) {
 }
 
 bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
+  (void)netif;
+
   if (!s_tpmesh_initialized || !s_is_top_node) {
+    return false;
+  }
+  if (s_uart6_taken_over || !tpmesh_at_is_uart6_active()) {
     return false;
   }
 
@@ -225,10 +233,37 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
 
 bool tpmesh_is_initialized(void) { return s_tpmesh_initialized; }
 
+void tpmesh_request_uart6_takeover(void) {
+  if (!s_tpmesh_initialized) {
+    return;
+  }
+  int ret = tpmesh_at_release_uart6();
+  if (ret == 0) {
+    s_uart6_taken_over = true;
+  } else {
+    tpmesh_debug_printf("TPMesh: UART6 takeover request failed (%d)\n", ret);
+  }
+}
+
+int tpmesh_reclaim_uart6_for_tpmesh(void) {
+  if (!s_tpmesh_initialized) {
+    return -1;
+  }
+  int ret = tpmesh_at_acquire_uart6();
+  if (ret == 0) {
+    s_uart6_taken_over = false;
+  }
+  return ret;
+}
+
+bool tpmesh_is_uart6_taken_over(void) { return s_uart6_taken_over; }
+
 void tpmesh_print_status(void) {
   tpmesh_debug_printf("\n=== TPMesh Status ===\n");
   tpmesh_debug_printf("Initialized: %s\n", s_tpmesh_initialized ? "Yes" : "No");
   tpmesh_debug_printf("Mode: %s\n", s_is_top_node ? "Top Node" : "DDC");
+  tpmesh_debug_printf("UART6 owner: %s\n",
+                      s_uart6_taken_over ? "External" : "x_protocol");
 
   if (s_tpmesh_initialized) {
     tpmesh_debug_printf("Tasks:\n");

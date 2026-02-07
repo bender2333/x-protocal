@@ -305,3 +305,24 @@ node_table_dump();
 1. 如果使用自定义串口日志，请关注 `AT+SEND` 日志格式已新增 TYPE 参数。
 2. 建议在联调时抓取模组 URC，确认收到 `+NNMI:<SRC>,<DEST>,<RSSI>,<LEN>,<DATA>`。
 3. DDC 模式下建议验证 LwIP 输入线程模型（`netif->input` 回调成功返回）。
+
+---
+
+## UART6 Takeover Integration (V0.8)
+
+When an external module needs UART6 to configure TPMesh:
+
+1. Call `tpmesh_request_uart6_takeover()` before external configuration.
+2. External module performs UART6 configuration sequence.
+3. Restart DDC service/device to relaunch x_protocol.
+
+Optional (non-restart reclaim):
+
+- Call `tpmesh_reclaim_uart6_for_tpmesh()`.
+
+Compile-time policy:
+
+- `TPMESH_MODULE_INIT_POLICY=TPMESH_MODULE_INIT_BY_X_PROTOCOL` (default)
+- `TPMESH_MODULE_INIT_POLICY=TPMESH_MODULE_INIT_BY_EXTERNAL`
+
+Details: `App/x_protocol/UART6_TAKEOVER_MODE.md`

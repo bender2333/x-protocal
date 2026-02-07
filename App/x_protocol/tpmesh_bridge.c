@@ -263,6 +263,9 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
   if (!s_initialized || !s_is_top_node) {
     return -1;
   }
+  if (!tpmesh_at_is_uart6_active()) {
+    return -5;
+  }
 
   struct eth_hdr *eth = (struct eth_hdr *)p->payload;
   bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
@@ -353,7 +356,8 @@ void tpmesh_bridge_task(void *arg) {
   tpmesh_at_set_data_cb(mesh_data_callback);
   tpmesh_at_set_route_cb(route_event_callback);
 
-  /* 模组 AT 命令初始化 (支持重试) */
+/* 模组初始化策略 */
+#if (TPMESH_MODULE_INIT_POLICY == TPMESH_MODULE_INIT_BY_X_PROTOCOL)
   {
     uint16_t mesh_id =
         s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
@@ -373,6 +377,10 @@ void tpmesh_bridge_task(void *arg) {
       vTaskDelay(pdMS_TO_TICKS(3000));
     }
   }
+#else
+  tpmesh_debug_printf(
+      "Bridge: external config mode, skip module AT init sequence\n");
+#endif
 
   tpmesh_debug_printf(
       "Bridge Task: business init complete, entering main loop\n");
@@ -400,6 +408,10 @@ void tpmesh_bridge_task(void *arg) {
  */
 
 int ddc_send_register(const ddc_config_t *config) {
+  if (!tpmesh_at_is_uart6_active()) {
+    return -1;
+  }
+
   reg_frame_t frame;
   frame.frame_type = REG_FRAME_REGISTER;
   memcpy(frame.mac, config->mac_addr, 6);
@@ -419,6 +431,10 @@ int ddc_send_register(const ddc_config_t *config) {
 }
 
 int ddc_send_heartbeat(const ddc_config_t *config) {
+  if (!tpmesh_at_is_uart6_active()) {
+    return -1;
+  }
+
   reg_frame_t frame;
   frame.frame_type = REG_FRAME_HEARTBEAT;
   memcpy(frame.mac, config->mac_addr, 6);
@@ -439,6 +455,11 @@ void ddc_heartbeat_task(void *arg) {
   (void)arg;
 
   while (1) {
+    if (!tpmesh_at_is_uart6_active()) {
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
     uint32_t now = tpmesh_get_tick_ms();
 
     switch (s_ddc_state) {
@@ -591,6 +612,10 @@ static void route_event_callback(const char *event, uint16_t addr) {
 
 static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
                              uint16_t len) {
+  if (!tpmesh_at_is_uart6_active()) {
+    return -2;
+  }
+
   if (len <= TPMESH_MTU) {
     /* 无需分片 */
     return tpmesh_at_send(dest_mesh_id, data, len);

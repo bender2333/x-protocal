@@ -161,6 +161,9 @@ void tpmesh_uart6_deinit(void)
 
 int tpmesh_uart6_send(const uint8_t *data, uint16_t len)
 {
+    if (!s_initialized) {
+        return -3;
+    }
     if (data == NULL || len == 0) {
         return -2;
     }
@@ -191,6 +194,9 @@ int tpmesh_uart6_puts(const char *str)
 
 int tpmesh_uart6_getc(uint8_t *out)
 {
+    if (!s_initialized || out == NULL) {
+        return -1;
+    }
     if (s_rx_head == s_rx_tail) {
         return -1;  /* 无数据 */
     }
@@ -222,11 +228,17 @@ int tpmesh_uart6_getc_timeout(uint8_t *out, uint32_t timeout_ms)
 
 uint16_t tpmesh_uart6_rx_available(void)
 {
+    if (!s_initialized) {
+        return 0;
+    }
     return rx_count();
 }
 
 void tpmesh_uart6_rx_flush(void)
 {
+    if (!s_initialized) {
+        return;
+    }
     s_rx_tail = s_rx_head;
 }
 
@@ -236,6 +248,10 @@ void tpmesh_uart6_rx_flush(void)
 
 void tpmesh_uart6_irq_handler(void)
 {
+    if (!s_initialized) {
+        return;
+    }
+
     /* ---- RBNE: 收到数据 ---- */
     if (usart_interrupt_flag_get(UART6_PERIPH, USART_INT_FLAG_RBNE) != RESET) {
         uint8_t ch = (uint8_t)usart_data_receive(UART6_PERIPH);

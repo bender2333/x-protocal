@@ -71,6 +71,7 @@ static uint16_t s_line_idx = 0;
 static tpmesh_data_cb_t s_data_cb = NULL;
 static tpmesh_route_cb_t s_route_cb = NULL;
 static bool s_initialized = false;
+static volatile bool s_uart6_active = false;
 
 /* ============================================================================
  * 私有函数声明
@@ -91,6 +92,9 @@ static void bytes_to_hex(const uint8_t *data, uint16_t len, char *hex);
 
 int tpmesh_at_init(void) {
   if (s_initialized) {
+    if (!s_uart6_active) {
+      return tpmesh_at_acquire_uart6();
+    }
     return 0;
   }
 
@@ -133,6 +137,7 @@ int tpmesh_at_init(void) {
   s_route_cb = NULL;
 
   s_initialized = true;
+  s_uart6_active = true;
   tpmesh_debug_printf("AT: Initialized (queue + mutex)\n");
   return 0;
 }
@@ -150,8 +155,65 @@ void tpmesh_at_deinit(void) {
     vSemaphoreDelete(s_tx_mutex);
     s_tx_mutex = NULL;
   }
+  s_uart6_active = false;
   s_initialized = false;
 }
+
+int tpmesh_at_release_uart6(void) {
+  if (!s_initialized || !s_uart6_active) {
+    return 0;
+  }
+
+  bool took_mutex = false;
+  if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED && s_tx_mutex) {
+    BaseType_t locked = xSemaphoreTake(s_tx_mutex, pdMS_TO_TICKS(1000));
+    if (locked != pdTRUE) {
+      tpmesh_debug_printf("AT: UART6 release busy\n");
+      return -3;
+    }
+    took_mutex = true;
+  }
+
+  tpmesh_uart6_deinit();
+  s_uart6_active = false;
+  s_line_idx = 0;
+  s_line_buf[0] = '\0';
+
+  if (s_resp_queue) {
+    at_resp_t r = AT_RESP_TIMEOUT;
+    xQueueOverwrite(s_resp_queue, &r);
+  }
+
+  if (took_mutex && s_tx_mutex) {
+    xSemaphoreGive(s_tx_mutex);
+  }
+
+  tpmesh_debug_printf("AT: UART6 released for external owner\n");
+  return 0;
+}
+
+int tpmesh_at_acquire_uart6(void) {
+  if (!s_initialized) {
+    return -1;
+  }
+  if (s_uart6_active) {
+    return 0;
+  }
+
+  if (tpmesh_uart6_init() != 0) {
+    tpmesh_debug_printf("AT: UART6 re-acquire failed\n");
+    return -2;
+  }
+
+  tpmesh_uart6_rx_flush();
+  s_line_idx = 0;
+  s_line_buf[0] = '\0';
+  s_uart6_active = true;
+  tpmesh_debug_printf("AT: UART6 re-acquired by x_protocol\n");
+  return 0;
+}
+
+bool tpmesh_at_is_uart6_active(void) { return s_initialized && s_uart6_active; }
 
 /* ============================================================================
  * 内部核心: 发送原始数据 + 等待响应
@@ -177,6 +239,10 @@ void tpmesh_at_deinit(void) {
  */
 static at_resp_t send_and_wait(const uint8_t *raw, uint16_t raw_len,
                                uint32_t timeout_ms) {
+  if (!s_initialized || !s_uart6_active) {
+    return AT_RESP_ERROR;
+  }
+
   /* 1. 获取 TX 互斥锁 (最长等 5 秒) */
   if (xSemaphoreTake(s_tx_mutex, pdMS_TO_TICKS(5000)) != pdTRUE) {
     tpmesh_debug_printf("AT: TX mutex timeout\n");
@@ -211,7 +277,7 @@ static at_resp_t send_and_wait(const uint8_t *raw, uint16_t raw_len,
  */
 
 at_resp_t tpmesh_at_cmd(const char *cmd, uint32_t timeout_ms) {
-  if (!s_initialized || cmd == NULL) {
+  if (!s_initialized || !s_uart6_active || cmd == NULL) {
     return AT_RESP_ERROR;
   }
 
@@ -229,7 +295,7 @@ at_resp_t tpmesh_at_cmd(const char *cmd, uint32_t timeout_ms) {
 }
 
 int tpmesh_at_cmd_no_wait(const char *cmd) {
-  if (!s_initialized || cmd == NULL) {
+  if (!s_initialized || !s_uart6_active || cmd == NULL) {
     return -1;
   }
 
@@ -249,7 +315,7 @@ int tpmesh_at_cmd_no_wait(const char *cmd) {
 
 at_resp_t tpmesh_at_send_data(uint16_t dest_mesh_id, const uint8_t *data,
                               uint16_t len) {
-  if (!s_initialized || data == NULL || len == 0) {
+  if (!s_initialized || !s_uart6_active || data == NULL || len == 0) {
     return AT_RESP_ERROR;
   }
   if (len > TPMESH_MTU) {
@@ -356,6 +422,10 @@ void tpmesh_at_rx_task(void *arg) {
   tpmesh_debug_printf("AT RX Task: started\n");
 
   while (1) {
+    if (!s_uart6_active) {
+      vTaskDelay(pdMS_TO_TICKS(20));
+      continue;
+    }
     parse_rx_bytes();
     vTaskDelay(pdMS_TO_TICKS(1)); /* 1ms 轮询周期 */
   }
