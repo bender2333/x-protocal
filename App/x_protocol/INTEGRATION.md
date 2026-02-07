@@ -290,3 +290,18 @@ node_table_dump();
 ## 版本历史
 
 - V0.6.2 (2026-02-04): 初始集成版本
+
+
+## 变更记录（V0.7 / 2026-02-07）
+
+### 架构更新
+- AT 发送格式与 TPMESH_V1-6 对齐：`AT+SEND=<ADDR>,<LEN>,<DATA>,<TYPE>`。
+- +NNMI 解析支持标准 5 字段格式（SRC/DEST/RSSI/LEN/DATA），并兼容旧 3 字段格式。
+- 模组初始化补全 `AT+TYPE`、`AT+LP`、`AT+NNMI`。
+- DDC 侧 Mesh 下行数据打通到 LwIP 输入路径。
+- 增加 Mesh 隧道头最小长度校验，避免短帧越界访问。
+
+### 对集成方影响
+1. 如果使用自定义串口日志，请关注 `AT+SEND` 日志格式已新增 TYPE 参数。
+2. 建议在联调时抓取模组 URC，确认收到 `+NNMI:<SRC>,<DEST>,<RSSI>,<LEN>,<DATA>`。
+3. DDC 模式下建议验证 LwIP 输入线程模型（`netif->input` 回调成功返回）。

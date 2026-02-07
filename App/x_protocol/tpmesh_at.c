@@ -255,19 +255,19 @@ at_resp_t tpmesh_at_send_data(uint16_t dest_mesh_id, const uint8_t *data,
     return AT_RESP_ERROR;
   }
 
-  /* 构建 "AT+SEND=XXXX,LEN,HEXDATA\r\n" */
+  /* 构建 "AT+SEND=XXXX,LEN,HEXDATA,TYPE\r\n" */
   char cmd[TPMESH_AT_CMD_MAX_LEN];
-  char *p = cmd;
+  char hex_data[TPMESH_MTU * 2 + 1];
+  bytes_to_hex(data, len, hex_data);
 
-  p += sprintf(p, "AT+SEND=%04X,%d,", dest_mesh_id, len);
-  bytes_to_hex(data, len, p);
-  p += len * 2;
-  *p++ = '\r';
-  *p++ = '\n';
-  *p = '\0';
+  int cmd_len = snprintf(cmd, sizeof(cmd), "AT+SEND=%04X,%u,%s,%u\r\n",
+                         dest_mesh_id, (unsigned)len, hex_data,
+                         (unsigned)TPMESH_AT_SEND_TYPE_DEFAULT);
+  if (cmd_len <= 0 || cmd_len >= (int)sizeof(cmd)) {
+    return AT_RESP_ERROR;
+  }
 
-  return send_and_wait((uint8_t *)cmd, (uint16_t)(p - cmd),
-                       TPMESH_AT_TIMEOUT_MS);
+  return send_and_wait((uint8_t *)cmd, (uint16_t)cmd_len, TPMESH_AT_TIMEOUT_MS);
 }
 
 /* ============================================================================
@@ -325,21 +325,28 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
     return -3;
   }
 
-  /* 设置功耗模式 */
-  // TODO: AT+LP
-  //   r = tpmesh_at_cmd(is_top_node ? "AT+TYPE=CENTER" : "AT+TYPE=ORDINARY",
-  //                     TPMESH_AT_TIMEOUT_MS);
-  //   if (r != AT_RESP_OK) {
-  //     tpmesh_debug_printf("Module: TYPE failed\n");
-  //     return -4;
-  //   }
+  /* 设置节点类型 */
+  r = tpmesh_at_cmd(is_top_node ? "AT+TYPE=CENTER" : "AT+TYPE=ORDINARY",
+                    TPMESH_AT_TIMEOUT_MS);
+  if (r != AT_RESP_OK) {
+    tpmesh_debug_printf("Module: TYPE failed\n");
+    return -4;
+  }
 
-  /* 设置 NNMI 模式 */
-  //   r = tpmesh_at_cmd("AT+NNMI=1", TPMESH_AT_TIMEOUT_MS);
-  //   if (r != AT_RESP_OK) {
-  //     tpmesh_debug_printf("Module: NNMI failed\n");
-  //     return -5;
-  //   }
+  /* 设置功耗模式 */
+  snprintf(cmd, sizeof(cmd), "AT+LP=%u", (unsigned)TPMESH_AT_LP_DEFAULT);
+  r = tpmesh_at_cmd(cmd, TPMESH_AT_TIMEOUT_MS);
+  if (r != AT_RESP_OK) {
+    tpmesh_debug_printf("Module: LP failed\n");
+    return -5;
+  }
+
+  /* 开启 NNMI 上报 */
+  r = tpmesh_at_cmd("AT+NNMI=1", TPMESH_AT_TIMEOUT_MS);
+  if (r != AT_RESP_OK) {
+    tpmesh_debug_printf("Module: NNMI failed\n");
+    return -6;
+  }
 
   tpmesh_debug_printf("Module: Init OK\n");
   return 0;
@@ -367,37 +374,77 @@ void tpmesh_at_rx_task(void *arg) {
 
 int tpmesh_at_parse_nnmi(const char *urc, uint16_t *src_mesh_id, uint8_t *data,
                          uint16_t *len) {
-  /* 格式: +NNMI:XXXX,LEN,HEXDATA */
+  /* 优先支持: +NNMI:<SRC>,<DEST>,<RSSI>,<LEN>,<DATA>
+   * 兼容旧格式: +NNMI:<SRC>,<LEN>,<DATA>
+   */
+  if (urc == NULL || src_mesh_id == NULL || data == NULL || len == NULL) {
+    return -10;
+  }
   if (strncmp(urc, "+NNMI:", 6) != 0) {
     return -1;
   }
 
   const char *p = urc + 6;
+  while (*p == ' ') p++;
 
-  /* 源地址 (4位hex) */
-  char addr_str[5] = {0};
-  strncpy(addr_str, p, 4);
-  *src_mesh_id = (uint16_t)strtol(addr_str, NULL, 16);
-  p += 4;
-
-  if (*p != ',')
+  char *endptr = NULL;
+  unsigned long src = strtoul(p, &endptr, 16);
+  if (endptr == p || *endptr != ',') {
     return -2;
-  p++;
+  }
+  *src_mesh_id = (uint16_t)src;
+  p = endptr + 1;
+  while (*p == ' ') p++;
 
-  /* 长度 */
-  *len = (uint16_t)atoi(p);
-  while (*p && *p != ',')
-    p++;
-  if (*p != ',')
-    return -3;
-  p++;
+  /* 尝试新格式: DEST,RSSI,LEN,DATA */
+  unsigned long dest = strtoul(p, &endptr, 16);
+  (void)dest;
+  if (endptr != p && *endptr == ',') {
+    p = endptr + 1;
+    while (*p == ' ') p++;
 
-  /* Hex 数据 */
-  int bytes = hex_to_bytes(p, data, *len);
-  if (bytes != *len) {
-    return -4;
+    (void)strtol(p, &endptr, 10); /* RSSI */
+    if (endptr != p && *endptr == ',') {
+      p = endptr + 1;
+      while (*p == ' ') p++;
+
+      unsigned long declared_len = strtoul(p, &endptr, 10);
+      if (endptr == p || *endptr != ',') {
+        return -3;
+      }
+      p = endptr + 1;
+      while (*p == ' ') p++;
+
+      if (declared_len > TPMESH_MTU || declared_len > *len) {
+        return -4;
+      }
+
+      int bytes = hex_to_bytes(p, data, (uint16_t)declared_len);
+      if (bytes != (int)declared_len) {
+        return -5;
+      }
+      *len = (uint16_t)declared_len;
+      return 0;
+    }
   }
 
+  /* 回退旧格式: LEN,DATA */
+  unsigned long declared_len = strtoul(p, &endptr, 10);
+  if (endptr == p || *endptr != ',') {
+    return -6;
+  }
+  p = endptr + 1;
+  while (*p == ' ') p++;
+
+  if (declared_len > TPMESH_MTU || declared_len > *len) {
+    return -7;
+  }
+  int bytes = hex_to_bytes(p, data, (uint16_t)declared_len);
+  if (bytes != (int)declared_len) {
+    return -8;
+  }
+
+  *len = (uint16_t)declared_len;
   return 0;
 }
 
@@ -470,7 +517,7 @@ static void dispatch_line(const char *line) {
   if (strncmp(line, "+NNMI:", 6) == 0) {
     uint16_t src_id = 0;
     uint8_t buf[TPMESH_MTU];
-    uint16_t urc_len = 0;
+    uint16_t urc_len = TPMESH_MTU;
 
     if (tpmesh_at_parse_nnmi(line, &src_id, buf, &urc_len) == 0) {
       if (s_data_cb) {
