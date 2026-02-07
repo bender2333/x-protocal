@@ -3,12 +3,12 @@
 
 # 技术架构设计说明书：基于 TPMesh 的 LwIP/BACnet 无线网关
 
-**项目名称:** BACnet over Sub-G (TPMesh L2 Tunnel Bridge)  
+**项目名称:** BACnet over Sub-G (TPMesh L2 Tunnel Bridge)
 **目标平台:** FreeRTOS + LwIP (Dual Stack)
 **核心模块:** TPMesh 无线模组 (UART 接口)
-**协议关键:** L2 隧道桥接 + 代理 ARP + 主动注册 + SCHC 压缩  
-**版本:** V0.6  
-**更新日期:** 2026-02-03
+**协议关键:** L2 隧道桥接 + 代理 ARP + 主动注册 + SCHC 压缩
+**版本:** V0.7
+**更新日期:** 2026-02-07
 
 ---
 
@@ -33,6 +33,29 @@
 | 头部压缩 | 无 | **SCHC 压缩 IP/UDP** |
 | 广播控制 | 过滤 | **过滤 + 限速** |
 | 隧道头部 | 5 字节 | **3 字节 (源地址从 URC 获取)** |
+
+### 1.4 V0.7 架构更新（实现对齐）
+
+为确保设计与 TPMESH_V1-6 模组协议一致，V0.7 在接口层与数据面进行以下更新：
+
+1. **AT+SEND 指令格式对齐**
+   - 由 `AT+SEND=<ADDR>,<LEN>,<DATA>` 更新为 `AT+SEND=<ADDR>,<LEN>,<DATA>,<TYPE>`。
+   - `TYPE` 作为链路策略参数，默认值为 `0`（普通模式），预留为编译期配置。
+
+2. **NNMI URC 解析增强**
+   - 优先解析文档格式：`+NNMI:<SRC>,<DEST>,<RSSI>,<LEN>,<DATA>`。
+   - 保留对历史简化格式 `+NNMI:<SRC>,<LEN>,<DATA>` 的兼容解析。
+
+3. **模组初始化序列补全**
+   - 启用 `AT+TYPE`（CENTER/ORDINARY）和 `AT+NNMI` 配置，确保网关能够接收下行 URC。
+   - 增加 `AT+LP` 默认配置，统一中心节点与边缘节点功耗行为。
+
+4. **DDC 下行数据链路闭环**
+   - DDC 接收到 Mesh 数据并解压后，直接注入本地 LwIP 输入路径（pbuf + netif->input）。
+   - 保障“DDC 在 BMS 看起来等效本地以太网节点”的架构目标。
+
+5. **Mesh 数据入口健壮性**
+   - 增加隧道最小头长度检查，避免异常短帧导致规则字段越界访问。
 
 ### 1.3 网络拓扑
 
@@ -140,19 +163,19 @@ typedef struct __attribute__((packed)) {
  */
 int ddc_send_register(ddc_config_t *config) {
     reg_frame_t frame;
-    
+
     frame.frame_type = REG_FRAME_TYPE_REGISTER;
     memcpy(frame.mac, config->mac_addr, 6);
     frame.ip = config->ip_addr.addr;
     frame.mesh_id = config->mesh_id;
     frame.checksum = calc_crc16(&frame, sizeof(frame) - 2);
-    
+
     // 发送到 Top Node (透传模式2: 前2字节是目标地址)
     uint8_t packet[2 + sizeof(reg_frame_t)];
     packet[0] = (MESH_ADDR_TOP_NODE >> 8) & 0xFF;
     packet[1] = MESH_ADDR_TOP_NODE & 0xFF;
     memcpy(&packet[2], &frame, sizeof(frame));
-    
+
     return uart_write(packet, sizeof(packet));
 }
 
@@ -161,24 +184,24 @@ int ddc_send_register(ddc_config_t *config) {
  */
 int ddc_send_heartbeat(ddc_config_t *config) {
     reg_frame_t frame;
-    
+
     frame.frame_type = REG_FRAME_TYPE_HEARTBEAT;
     memcpy(frame.mac, config->mac_addr, 6);
     frame.ip = config->ip_addr.addr;
     frame.mesh_id = config->mesh_id;
     frame.checksum = calc_crc16(&frame, sizeof(frame) - 2);
-    
+
     uint8_t packet[2 + sizeof(reg_frame_t)];
     packet[0] = (MESH_ADDR_TOP_NODE >> 8) & 0xFF;
     packet[1] = MESH_ADDR_TOP_NODE & 0xFF;
     memcpy(&packet[2], &frame, sizeof(frame));
-    
+
     return uart_write(packet, sizeof(packet));
 }
 
 /**
  * @brief DDC 注册/心跳任务 (带重传状态机)
- * 
+ *
  * 状态机:
  *   REGISTERING -> (收到ACK) -> ONLINE -> (心跳超时) -> REGISTERING
  */
@@ -208,16 +231,16 @@ void ddc_on_register_ack(void) {
 void ddc_heartbeat_task(void *arg) {
     ddc_config_t *config = (ddc_config_t *)arg;
     uint8_t retry_count = 0;
-    
+
     g_ddc_state = DDC_STATE_REGISTERING;
-    
+
     while (1) {
         switch (g_ddc_state) {
             case DDC_STATE_REGISTERING: {
                 // 发送注册请求
                 ddc_send_register(config);
                 retry_count++;
-                
+
                 // 等待 ACK (带超时)
                 g_register_ack_received = false;
                 for (int i = 0; i < REGISTER_RETRY_INTERVAL_MS / 100; i++) {
@@ -229,7 +252,7 @@ void ddc_heartbeat_task(void *arg) {
                         break;
                     }
                 }
-                
+
                 // 超时检查
                 if (g_ddc_state == DDC_STATE_REGISTERING) {
                     if (retry_count >= REGISTER_MAX_RETRIES) {
@@ -240,14 +263,14 @@ void ddc_heartbeat_task(void *arg) {
                 }
                 break;
             }
-            
+
             case DDC_STATE_ONLINE: {
                 // 定时发送心跳
                 vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
                 ddc_send_heartbeat(config);
                 break;
             }
-            
+
             default:
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 break;
@@ -264,14 +287,14 @@ void ddc_heartbeat_task(void *arg) {
  */
 void top_handle_reg_frame(uint16_t src_mesh_id, const uint8_t *data, uint16_t len) {
     if (len < sizeof(reg_frame_t)) return;
-    
+
     reg_frame_t *frame = (reg_frame_t *)data;
-    
+
     // 校验 CRC
     if (calc_crc16(frame, sizeof(reg_frame_t) - 2) != frame->checksum) {
         return;
     }
-    
+
     switch (frame->frame_type) {
         case REG_FRAME_TYPE_REGISTER:
         case REG_FRAME_TYPE_HEARTBEAT: {
@@ -279,14 +302,14 @@ void top_handle_reg_frame(uint16_t src_mesh_id, const uint8_t *data, uint16_t le
             ip4_addr_t ip;
             ip.addr = frame->ip;
             node_table_learn(frame->mac, &ip, frame->mesh_id);
-            
+
             // 回复确认
             if (frame->frame_type == REG_FRAME_TYPE_REGISTER) {
                 send_reg_ack(src_mesh_id);
             }
             break;
         }
-        
+
         default:
             break;
     }
@@ -299,18 +322,18 @@ void send_reg_ack(uint16_t dest_mesh_id) {
     reg_frame_t ack;
     ack.frame_type = REG_FRAME_TYPE_REGISTER_ACK;
     // ... 填充 Top Node 信息
-    
+
     uint8_t packet[2 + sizeof(reg_frame_t)];
     packet[0] = (dest_mesh_id >> 8) & 0xFF;
     packet[1] = dest_mesh_id & 0xFF;
     memcpy(&packet[2], &ack, sizeof(ack));
-    
+
     uart_write(packet, sizeof(packet));
 }
 
 /**
  * @brief 发送免费 ARP (Gratuitous ARP)
- * 
+ *
  * 当 DDC 注册成功后，Top Node 主动向以太网发送 GARP
  * 作用: 刷新 BMS 的 ARP 缓存和交换机的 MAC 表
  */
@@ -318,27 +341,27 @@ void send_gratuitous_arp(const uint8_t *ddc_mac, const ip4_addr_t *ddc_ip) {
     uint8_t garp[SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR];
     struct eth_hdr *eth = (struct eth_hdr *)garp;
     struct etharp_hdr *arp = (struct etharp_hdr *)(garp + SIZEOF_ETH_HDR);
-    
+
     // 以太网头: 广播
     memset(eth->dest.addr, 0xFF, 6);           // 广播
     memcpy(eth->src.addr, ddc_mac, 6);         // DDC MAC (让交换机学习)
     eth->type = PP_HTONS(ETHTYPE_ARP);
-    
+
     // ARP: 免费 ARP (源 IP = 目标 IP)
     arp->hwtype = PP_HTONS(HWTYPE_ETHERNET);
     arp->proto = PP_HTONS(ETHTYPE_IP);
     arp->hwlen = 6;
     arp->protolen = 4;
     arp->opcode = PP_HTONS(ARP_REQUEST);  // 或 ARP_REPLY 都可以
-    
+
     // 发送方 = DDC
     memcpy(arp->shwaddr.addr, ddc_mac, 6);
     SMEMCPY(&arp->sipaddr, ddc_ip, sizeof(ip4_addr_t));
-    
+
     // 目标 = DDC (免费 ARP 的特征)
     memset(arp->dhwaddr.addr, 0x00, 6);        // 或广播
     SMEMCPY(&arp->dipaddr, ddc_ip, sizeof(ip4_addr_t));
-    
+
     // 发送到以太网
     struct pbuf *p = pbuf_alloc(PBUF_RAW, sizeof(garp), PBUF_RAM);
     if (p) {
@@ -353,41 +376,41 @@ void send_gratuitous_arp(const uint8_t *ddc_mac, const ip4_addr_t *ddc_ip) {
  */
 void top_handle_reg_frame_v2(uint16_t src_mesh_id, const uint8_t *data, uint16_t len) {
     if (len < sizeof(reg_frame_t)) return;
-    
+
     reg_frame_t *frame = (reg_frame_t *)data;
-    
+
     // 校验 CRC
     if (calc_crc16(frame, sizeof(reg_frame_t) - 2) != frame->checksum) {
         return;
     }
-    
+
     ip4_addr_t ip;
     ip.addr = frame->ip;
-    
+
     switch (frame->frame_type) {
         case REG_FRAME_TYPE_REGISTER: {
             // 注册请求
             bool is_new = !node_table_is_registered(frame->mesh_id);
-            
+
             // 更新映射表
             node_table_learn(frame->mac, &ip, frame->mesh_id);
-            
+
             // 回复确认
             send_reg_ack(src_mesh_id);
-            
+
             // ★ 如果是新节点，发送免费 ARP ★
             if (is_new) {
                 send_gratuitous_arp(frame->mac, &ip);
             }
             break;
         }
-        
+
         case REG_FRAME_TYPE_HEARTBEAT: {
             // 心跳: 更新活跃时间
             node_table_learn(frame->mac, &ip, frame->mesh_id);
             break;
         }
-        
+
         default:
             break;
     }
@@ -428,11 +451,11 @@ filter_action_t handle_arp_request(const uint8_t *eth_frame, uint16_t len) {
     const struct eth_hdr *eth = (const struct eth_hdr *)eth_frame;
     const struct etharp_hdr *arp = (const struct etharp_hdr *)
         (eth_frame + SIZEOF_ETH_HDR);
-    
+
     // 提取目标 IP
     ip4_addr_t target_ip;
     SMEMCPY(&target_ip, &arp->dipaddr, sizeof(ip4_addr_t));
-    
+
     // 查找映射表
     uint8_t target_mac[6];
     if (node_table_get_mac_by_ip(&target_ip, target_mac) == 0) {
@@ -440,14 +463,14 @@ filter_action_t handle_arp_request(const uint8_t *eth_frame, uint16_t len) {
         send_proxy_arp_reply(eth_frame, target_mac, &target_ip);
         return FILTER_DROP;  // 不转发到 Mesh
     }
-    
+
     // 不在表中，丢弃 (等 DDC 注册后再试)
     return FILTER_DROP;
 }
 
 /**
  * @brief 发送代理 ARP 回复
- * 
+ *
  * 关键: 回复 DDC 的真实 MAC 地址
  * 这样 BMS 的 ARP 缓存中是 DDC 的真实 MAC
  */
@@ -457,32 +480,32 @@ void send_proxy_arp_reply(const uint8_t *arp_request,
     const struct eth_hdr *req_eth = (const struct eth_hdr *)arp_request;
     const struct etharp_hdr *req_arp = (const struct etharp_hdr *)
         (arp_request + SIZEOF_ETH_HDR);
-    
+
     // 构建 ARP 回复
     uint8_t reply[SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR];
     struct eth_hdr *rep_eth = (struct eth_hdr *)reply;
     struct etharp_hdr *rep_arp = (struct etharp_hdr *)(reply + SIZEOF_ETH_HDR);
-    
+
     // 以太网头
     memcpy(rep_eth->dest.addr, req_eth->src.addr, 6);  // 发给请求者
     memcpy(rep_eth->src.addr, target_mac, 6);          // ★ DDC 的真实 MAC ★
     rep_eth->type = PP_HTONS(ETHTYPE_ARP);
-    
+
     // ARP 回复
     rep_arp->hwtype = PP_HTONS(HWTYPE_ETHERNET);
     rep_arp->proto = PP_HTONS(ETHTYPE_IP);
     rep_arp->hwlen = 6;
     rep_arp->protolen = 4;
     rep_arp->opcode = PP_HTONS(ARP_REPLY);
-    
+
     // 发送方 = DDC (Target)
     memcpy(rep_arp->shwaddr.addr, target_mac, 6);      // ★ DDC 的真实 MAC ★
     SMEMCPY(&rep_arp->sipaddr, target_ip, sizeof(ip4_addr_t));
-    
+
     // 目标 = 请求者 (BMS)
     memcpy(rep_arp->dhwaddr.addr, req_arp->shwaddr.addr, 6);
     SMEMCPY(&rep_arp->dipaddr, &req_arp->sipaddr, sizeof(ip4_addr_t));
-    
+
     // 发送到以太网
     struct pbuf *p = pbuf_alloc(PBUF_RAW, sizeof(reply), PBUF_RAM);
     if (p) {
@@ -569,67 +592,67 @@ AT+SEND 发送:
 ```c
 /**
  * @brief AT+SEND 模式发送
- * 
+ *
  * @param dest_mesh_id 目标 Mesh ID
  * @param data 二进制数据
  * @param len 数据长度 (最大 200)
  * @return int 0=成功
  */
-int tpmesh_send_at(uint16_t dest_mesh_id, 
+int tpmesh_send_at(uint16_t dest_mesh_id,
                    const uint8_t *data, uint16_t len) {
     char cmd[512];  // AT+SEND=XXXX,LEN, + 400 hex chars + \r\n
     char *p = cmd;
-    
+
     if (len > 200) return -1;
-    
+
     // 构建 AT 命令头
     p += sprintf(p, "AT+SEND=%04X,%d,", dest_mesh_id, len);
-    
+
     // 转换为 Hex 字符串
     for (uint16_t i = 0; i < len; i++) {
         p += sprintf(p, "%02X", data[i]);
     }
-    
+
     // 添加结束符
     *p++ = '\r';
     *p++ = '\n';
     *p = '\0';
-    
+
     // 发送 AT 命令
     return uart_write_string(cmd);
 }
 
 /**
  * @brief 解析 +NNMI URC
- * 
+ *
  * 输入: "+NNMI:0002,10,0180010203040506070809\r\n"
  * 输出: src_mesh_id=0x0002, data=[...], len=10
  */
-int tpmesh_parse_nnmi(const char *urc, 
+int tpmesh_parse_nnmi(const char *urc,
                       uint16_t *src_mesh_id,
                       uint8_t *data, uint16_t *len) {
     // 跳过 "+NNMI:"
     if (strncmp(urc, "+NNMI:", 6) != 0) return -1;
     urc += 6;
-    
+
     // 解析源地址 (4 位 hex)
     char addr_str[5];
     strncpy(addr_str, urc, 4);
     addr_str[4] = '\0';
     *src_mesh_id = (uint16_t)strtol(addr_str, NULL, 16);
     urc += 5;  // 跳过 "XXXX,"
-    
+
     // 解析长度
     *len = (uint16_t)atoi(urc);
     while (*urc && *urc != ',') urc++;
     urc++;  // 跳过 ","
-    
+
     // 解析 Hex 数据
     for (uint16_t i = 0; i < *len; i++) {
         char hex[3] = { urc[i*2], urc[i*2+1], '\0' };
         data[i] = (uint8_t)strtol(hex, NULL, 16);
     }
-    
+
     return 0;
 }
 ```
@@ -686,7 +709,7 @@ Rule ID:
 ```c
 /**
  * @brief 封装以太网帧 (带 SCHC 压缩)
- * 
+ *
  * V0.6.2: 去掉 SRC_MESH 字段，源地址从 AT URC 获取
  * 帧格式: [L2_HDR:1][FRAG_HDR:1][Rule:1][Payload:N]
  */
@@ -695,73 +718,73 @@ int l2_encapsulate(const uint8_t *eth_frame, uint16_t eth_len,
                    bool is_broadcast) {
     const struct eth_hdr *eth = (const struct eth_hdr *)eth_frame;
     uint16_t ethertype = lwip_ntohs(eth->type);
-    
+
     // L2 Header (1 byte)
     out_data[0] = is_broadcast ? 0x80 : 0x00;
-    
+
     // Frag Header (1 byte, 初始为最后一片)
     out_data[1] = 0x80;
-    
+
     // ★ V0.6.2: 无 SRC_MESH，从 AT URC 获取 ★
-    
+
     // 尝试 SCHC 压缩
     if (ethertype == ETHERTYPE_IP) {
         const struct ip_hdr *iph = (const struct ip_hdr *)
             (eth_frame + SIZEOF_ETH_HDR);
-        
+
         if (IPH_PROTO(iph) == IP_PROTO_UDP) {
             const struct udp_hdr *udph = (const struct udp_hdr *)
                 ((uint8_t *)iph + IPH_HL(iph) * 4);
-            
+
             uint16_t dst_port = lwip_ntohs(udph->dest);
-            
+
             if (dst_port == PORT_BACNET) {
                 // ★ BACnet/IP: 压缩 IP + UDP 头 (28字节) ★
                 out_data[2] = 0x01;  // Rule ID
-                
+
                 // 只保留 SRC MAC + BACnet APDU
                 memcpy(&out_data[3], eth->src.addr, 6);
-                
-                uint16_t udp_payload_offset = SIZEOF_ETH_HDR + 
+
+                uint16_t udp_payload_offset = SIZEOF_ETH_HDR +
                     IPH_HL(iph) * 4 + sizeof(struct udp_hdr);
                 uint16_t udp_payload_len = eth_len - udp_payload_offset;
-                
+
                 memcpy(&out_data[9], eth_frame + udp_payload_offset, udp_payload_len);
-                
+
                 *out_len = 9 + udp_payload_len;
                 return 0;
             }
         }
-        
+
         // 其他 IP: 压缩 IP 头 (20字节)
         out_data[2] = 0x02;
         memcpy(&out_data[3], eth->src.addr, 6);
-        
+
         uint16_t ip_payload_offset = SIZEOF_ETH_HDR + IPH_HL(iph) * 4;
         uint16_t ip_payload_len = eth_len - ip_payload_offset;
-        
+
         memcpy(&out_data[9], eth_frame + ip_payload_offset, ip_payload_len);
-        
+
         *out_len = 9 + ip_payload_len;
         return 0;
     }
-    
+
     // 非 IP: 不压缩
     out_data[2] = 0x00;
-    
+
     // 完整以太网帧 (跳过目标 MAC，因为可从 Mesh 地址恢复)
     memcpy(&out_data[3], eth->src.addr, 6);           // SRC MAC
     memcpy(&out_data[9], &eth->type, eth_len - 12);   // EtherType + Payload
-    
+
     *out_len = 3 + 6 + (eth_len - 12);
     return 0;
 }
 
 /**
  * @brief 解封装 (带 SCHC 解压)
- * 
+ *
  * V0.6.2: 源地址从 AT URC +NNMI:SRC_ADDR,... 获取
- * 
+ *
  * @param mesh_data 隧道帧数据 [L2_HDR:1][FRAG_HDR:1][Rule:1][Payload:N]
  * @param mesh_len 隧道帧长度
  * @param out_frame 输出以太网帧
@@ -777,9 +800,9 @@ int l2_decapsulate(const uint8_t *mesh_data, uint16_t mesh_len,
     uint8_t rule_id = mesh_data[2];
     const uint8_t *payload = &mesh_data[3];
     uint16_t payload_len = mesh_len - 3;
-    
+
     struct eth_hdr *eth = (struct eth_hdr *)out_frame;
-    
+
     // 恢复目标 MAC
     if (l2_hdr & 0x80) {
         memset(eth->dest.addr, 0xFF, 6);  // 广播
@@ -789,28 +812,28 @@ int l2_decapsulate(const uint8_t *mesh_data, uint16_t mesh_len,
             get_local_mac(eth->dest.addr);  // 默认本机
         }
     }
-    
+
     // 恢复源 MAC
     memcpy(eth->src.addr, payload, 6);
     payload += 6;
     payload_len -= 6;
-    
+
     // 动态学习 (使用 AT URC 提供的源地址)
     node_table_learn_by_mesh(src_mesh_id, eth->src.addr);
-    
+
     switch (rule_id) {
         case 0x01: {
             // BACnet/IP: 重建 IP + UDP 头
-            return rebuild_bacnet_frame(out_frame, out_len, 
+            return rebuild_bacnet_frame(out_frame, out_len,
                                         payload, payload_len, src_mesh_id);
         }
-        
+
         case 0x02: {
             // IP: 重建 IP 头
             return rebuild_ip_frame(out_frame, out_len,
                                     payload, payload_len, src_mesh_id);
         }
-        
+
         case 0x00:
         default: {
             // 不压缩: 直接复制
@@ -831,10 +854,10 @@ int rebuild_bacnet_frame(uint8_t *out_frame, uint16_t *out_len,
     struct ip_hdr *iph = (struct ip_hdr *)(out_frame + SIZEOF_ETH_HDR);
     struct udp_hdr *udph = (struct udp_hdr *)(out_frame + SIZEOF_ETH_HDR + 20);
     uint8_t *data = out_frame + SIZEOF_ETH_HDR + 20 + 8;
-    
+
     // EtherType
     eth->type = PP_HTONS(ETHERTYPE_IP);
-    
+
     // IP 头
     uint16_t total_len = 20 + 8 + apdu_len;
     IPH_VHL_SET(iph, 4, 5);
@@ -844,27 +867,27 @@ int rebuild_bacnet_frame(uint8_t *out_frame, uint16_t *out_len,
     IPH_OFFSET_SET(iph, 0);
     IPH_TTL_SET(iph, 64);
     IPH_PROTO_SET(iph, IP_PROTO_UDP);
-    
+
     // 恢复 IP 地址 (从映射表)
     ip4_addr_t src_ip, dst_ip;
     node_table_get_ip_by_mesh_id(src_mesh_id, &src_ip);
     IP4_ADDR(&dst_ip, 192, 168, 10, 1);  // Top Node
-    
+
     iph->src = src_ip;
     iph->dest = dst_ip;
-    
+
     IPH_CHKSUM_SET(iph, 0);
     IPH_CHKSUM_SET(iph, inet_chksum(iph, 20));
-    
+
     // UDP 头
     udph->src = lwip_htons(PORT_BACNET);
     udph->dest = lwip_htons(PORT_BACNET);
     udph->len = lwip_htons(8 + apdu_len);
     udph->chksum = 0;
-    
+
     // BACnet APDU
     memcpy(data, bacnet_apdu, apdu_len);
-    
+
     *out_len = SIZEOF_ETH_HDR + total_len;
     return 0;
 }
@@ -893,20 +916,20 @@ static rate_limiter_t g_broadcast_limiter;
 bool broadcast_rate_check(void) {
     uint32_t now = get_tick_ms();
     uint32_t elapsed = now - g_broadcast_limiter.last_broadcast_tick;
-    
+
     if (elapsed >= BROADCAST_RATE_LIMIT_MS) {
         // 超过限速周期，重置
         g_broadcast_limiter.burst_count = 0;
         g_broadcast_limiter.last_broadcast_tick = now;
         return true;
     }
-    
+
     if (g_broadcast_limiter.burst_count < BROADCAST_BURST_MAX) {
         // 在突发允许范围内
         g_broadcast_limiter.burst_count++;
         return true;
     }
-    
+
     // 超过限速
     return false;
 }
@@ -918,7 +941,7 @@ filter_action_t filter_broadcast_frame_v6(const uint8_t *eth_frame,
                                           uint16_t len,
                                           uint16_t *dest_mesh) {
     // ... 原有过滤逻辑 ...
-    
+
     // BACnet 广播检查限速
     if (is_bacnet_broadcast(eth_frame, len)) {
         if (!broadcast_rate_check()) {
@@ -928,7 +951,7 @@ filter_action_t filter_broadcast_frame_v6(const uint8_t *eth_frame,
         *dest_mesh = MESH_ADDR_BROADCAST;
         return FILTER_FORWARD;
     }
-    
+
     // ... 其他逻辑 ...
 }
 ```
@@ -940,7 +963,7 @@ filter_action_t filter_broadcast_frame_v6(const uint8_t *eth_frame,
 ```c
 /**
  * @brief 分片并发送 (带延时)
- * 
+ *
  * V0.6.2: AT+SEND 模式，MTU=200 字节
  * 隧道头 3 字节 (L2_HDR + FRAG_HDR + Rule)，有效 MTU = 197 字节
  */
@@ -952,18 +975,18 @@ int l2_fragment_and_send(uint16_t dest_mesh_id,
                          bool is_broadcast) {
     uint8_t encap_buf[1600];
     uint16_t encap_len;
-    
+
     // 封装 (带压缩, V0.6.2 无需 src_mesh_id)
     l2_encapsulate(eth_frame, eth_len, encap_buf, &encap_len, is_broadcast);
-    
+
     // 分片发送
     uint8_t seq = 0;
     uint16_t offset = 0;
-    
+
     while (offset < encap_len) {
         uint8_t packet[200];
         uint16_t chunk_len;
-        
+
         if (seq == 0) {
             // 第一片: 完整头部
             chunk_len = MIN(200, encap_len);
@@ -976,26 +999,26 @@ int l2_fragment_and_send(uint16_t dest_mesh_id,
             memcpy(&packet[2], encap_buf + offset, chunk_len);
             chunk_len += 2;
         }
-        
+
         // 检查是否最后一片
-        bool is_last = (offset + chunk_len >= encap_len) || 
+        bool is_last = (offset + chunk_len >= encap_len) ||
                        (seq == 0 && chunk_len >= encap_len);
         if (is_last) {
             packet[1] |= 0x80;  // 设置 Last 标志
         }
-        
+
         // ★ 发送 (AT+SEND 模式) ★
         tpmesh_send_at(dest_mesh_id, packet, chunk_len);
-        
+
         offset += (seq == 0) ? chunk_len : (chunk_len - 2);
         seq++;
-        
+
         // ★ 分片间延时，防止模组 buffer 溢出 ★
         if (!is_last) {
             vTaskDelay(pdMS_TO_TICKS(FRAG_SEND_DELAY_MS));
         }
     }
-    
+
     return 0;
 }
 ```
@@ -1032,12 +1055,12 @@ static node_entry_t g_node_table[MAX_NODE_ENTRIES];
 void node_table_maintenance_task(void *arg) {
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));  // 10秒检查一次
-        
+
         uint32_t now = get_tick_ms();
-        
+
         for (int i = 0; i < MAX_NODE_ENTRIES; i++) {
             node_entry_t *entry = &g_node_table[i];
-            
+
             if (entry->valid && entry->source != 0) {
                 // 动态条目检查超时
                 if (now - entry->last_seen > NODE_TIMEOUT_MS) {
@@ -1276,35 +1299,35 @@ DDC 发出的广播帧（如 I-Am）需要特殊处理：
 ```c
 /**
  * @brief DDC 侧以太网输出处理 (拦截广播)
- * 
+ *
  * DDC 的所有以太网输出都需要通过 Mesh 隧道
  */
-err_t ddc_etharp_output(struct netif *netif, struct pbuf *p, 
+err_t ddc_etharp_output(struct netif *netif, struct pbuf *p,
                         const ip4_addr_t *ipaddr) {
     // 标准 ARP 解析流程
     // ...
-    
+
     // 发送前拦截
     return ddc_linkoutput(netif, p);
 }
 
 /**
  * @brief DDC 链路层输出 (所有帧都走隧道)
- * 
+ *
  * V0.6.2: 使用 AT+SEND 模式
  */
 err_t ddc_linkoutput(struct netif *netif, struct pbuf *p) {
     struct eth_hdr *eth = (struct eth_hdr *)p->payload;
     bool is_broadcast = is_broadcast_mac(eth->dest.addr);
-    
+
     // 封装并发送到 Top Node (V0.6.2: 无需 src_mesh_id)
     uint8_t encap_buf[1600];
     uint16_t encap_len;
-    
-    l2_encapsulate(p->payload, p->tot_len, 
+
+    l2_encapsulate(p->payload, p->tot_len,
                    encap_buf, &encap_len,
                    is_broadcast);  // ★ 标记广播 ★
-    
+
     // 广播帧也发送给 Top Node，由 Top Node 转发
     // (DDC 不直接 Mesh 广播，避免多 DDC 时的冲突)
     // ★ V0.6.2: 使用 AT+SEND 模式 ★
@@ -1317,31 +1340,31 @@ err_t ddc_linkoutput(struct netif *netif, struct pbuf *p) {
 ```c
 /**
  * @brief Top Node 处理来自 DDC 的数据帧
- * 
+ *
  * V0.6.2: src_mesh_id 从 AT URC +NNMI:SRC,... 获取
  */
-void top_handle_data_frame(uint16_t src_mesh_id, 
+void top_handle_data_frame(uint16_t src_mesh_id,
                            const uint8_t *data, uint16_t len) {
     // 分片重组
     uint8_t *complete_data;
     uint16_t complete_len;
-    
+
     int ret = reassemble_l2_packet(src_mesh_id, data, len,
                                    &complete_data, &complete_len);
     if (ret != 1) return;  // 未完成重组
-    
+
     // 解封装 (V0.6.2: src_mesh_id 从 AT URC 获取)
     uint8_t eth_frame[1600];
     uint16_t eth_len;
-    
+
     l2_decapsulate(complete_data, complete_len,
                    eth_frame, &eth_len,
                    src_mesh_id, MESH_ADDR_TOP_NODE);
-    
+
     // 检查是否广播帧
     uint8_t l2_hdr = complete_data[0];
     bool is_broadcast = (l2_hdr & 0x80) != 0;
-    
+
     if (is_broadcast) {
         // ★ 广播帧: 转发到以太网 ★
         forward_broadcast_to_eth(eth_frame, eth_len);
@@ -1383,7 +1406,7 @@ void forward_unicast_to_eth(const uint8_t *eth_frame, uint16_t len) {
 ```c
 /**
  * @brief 处理来自 DDC 的 ARP 请求
- * 
+ *
  * DDC 发送 ARP 请求询问以太网设备 (如 BMS) 的 MAC
  * Top Node 从本地 ARP 缓存回复，或转发到以太网
  */
@@ -1392,16 +1415,16 @@ void top_handle_ddc_arp_request(uint16_t src_mesh_id,
     const struct eth_hdr *eth = (const struct eth_hdr *)arp_frame;
     const struct etharp_hdr *arp = (const struct etharp_hdr *)
         (arp_frame + SIZEOF_ETH_HDR);
-    
+
     // 提取目标 IP
     ip4_addr_t target_ip;
     SMEMCPY(&target_ip, &arp->dipaddr, sizeof(ip4_addr_t));
-    
+
     // 检查本地 ARP 缓存
     struct eth_addr *target_mac;
     if (etharp_find_addr(&g_eth_netif, &target_ip, &target_mac, NULL) >= 0) {
         // ★ 缓存命中: 直接回复 DDC ★
-        send_arp_reply_to_ddc(src_mesh_id, arp_frame, 
+        send_arp_reply_to_ddc(src_mesh_id, arp_frame,
                               target_mac->addr, &target_ip);
     } else {
         // 缓存未命中: 转发到以太网，记录等待
@@ -1420,40 +1443,40 @@ void send_arp_reply_to_ddc(uint16_t dest_mesh_id,
     const struct eth_hdr *req_eth = (const struct eth_hdr *)arp_request;
     const struct etharp_hdr *req_arp = (const struct etharp_hdr *)
         (arp_request + SIZEOF_ETH_HDR);
-    
+
     // 构建 ARP Reply
     uint8_t reply[SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR];
     struct eth_hdr *rep_eth = (struct eth_hdr *)reply;
     struct etharp_hdr *rep_arp = (struct etharp_hdr *)
         (reply + SIZEOF_ETH_HDR);
-    
+
     // 以太网头
     memcpy(rep_eth->dest.addr, req_eth->src.addr, 6);   // → DDC
     memcpy(rep_eth->src.addr, target_mac, 6);           // ← BMS MAC
     rep_eth->type = PP_HTONS(ETHTYPE_ARP);
-    
+
     // ARP Reply
     rep_arp->hwtype = PP_HTONS(HWTYPE_ETHERNET);
     rep_arp->proto = PP_HTONS(ETHTYPE_IP);
     rep_arp->hwlen = 6;
     rep_arp->protolen = 4;
     rep_arp->opcode = PP_HTONS(ARP_REPLY);
-    
+
     // 发送方 = 目标 (BMS)
     memcpy(rep_arp->shwaddr.addr, target_mac, 6);
     SMEMCPY(&rep_arp->sipaddr, target_ip, sizeof(ip4_addr_t));
-    
+
     // 接收方 = 请求者 (DDC)
     memcpy(rep_arp->dhwaddr.addr, req_arp->shwaddr.addr, 6);
     SMEMCPY(&rep_arp->dipaddr, &req_arp->sipaddr, sizeof(ip4_addr_t));
-    
+
     // 封装并发送到 DDC
     uint8_t encap_buf[256];
     uint16_t encap_len;
-    
+
     l2_encapsulate_v6(reply, sizeof(reply), encap_buf, &encap_len,
                       MESH_ADDR_TOP_NODE, false);
-    
+
     tpmesh_send_transparent(dest_mesh_id, encap_buf, encap_len);
 }
 ```
@@ -1598,7 +1621,7 @@ int tpmesh_send_at(uint16_t dest_mesh_id,
                    const uint8_t *data, uint16_t len);
 
 // AT URC 解析
-int tpmesh_parse_nnmi(const char *urc, 
+int tpmesh_parse_nnmi(const char *urc,
                       uint16_t *src_mesh_id,
                       uint8_t *data, uint16_t *len);
 
@@ -1669,43 +1692,43 @@ static QueueHandle_t g_uart_rx_queue;
 
 /**
  * @brief UART 接收任务 (高优先级)
- * 
+ *
  * 职责: 快速搬运数据，不做复杂处理
  */
 void uart_rx_task(void *arg) {
     uint8_t rx_buf[UART_RX_BUF_SIZE];
     uint16_t rx_len = 0;
     uint32_t last_rx_tick = 0;
-    
+
     while (1) {
         // 从 DMA 缓冲区读取 (非阻塞)
-        int n = uart_read_nonblock(rx_buf + rx_len, 
+        int n = uart_read_nonblock(rx_buf + rx_len,
                                    UART_RX_BUF_SIZE - rx_len);
         if (n > 0) {
             rx_len += n;
             last_rx_tick = xTaskGetTickCount();
         }
-        
+
         // 帧边界检测 (超时断帧: 10ms 无新数据视为一帧结束)
-        if (rx_len > 0 && 
+        if (rx_len > 0 &&
             (xTaskGetTickCount() - last_rx_tick) > pdMS_TO_TICKS(10)) {
             // 组装消息
             uart_rx_msg_t msg;
             msg.len = rx_len;
             memcpy(msg.data, rx_buf, rx_len);
-            
+
             // 解析源 Mesh ID (从隧道头)
             // 透传模式接收不含地址，需从 payload 中 SRC_MESH 字段解析
             if (rx_len >= 4) {
                 msg.src_mesh_id = ((uint16_t)rx_buf[2] << 8) | rx_buf[3];
             }
-            
+
             // 放入队列 (不阻塞)
             xQueueSend(g_uart_rx_queue, &msg, 0);
-            
+
             rx_len = 0;
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(1));  // 1ms 轮询
     }
 }
@@ -1716,27 +1739,27 @@ void uart_rx_task(void *arg) {
 ```c
 /**
  * @brief Mesh 协议处理任务
- * 
+ *
  * 职责: 重组、解压、转发
  */
 void mesh_proto_task(void *arg) {
     uart_rx_msg_t msg;
-    
+
     while (1) {
         // 从队列取数据 (阻塞等待)
         if (xQueueReceive(g_uart_rx_queue, &msg, portMAX_DELAY) == pdTRUE) {
             // 检查帧类型
             uint8_t rule_id = msg.data[4];  // L2_HDR + FRAG + SRC_MESH 后
-            
+
             if (rule_id == SCHC_RULE_REGISTER) {
                 // 注册/心跳帧
-                top_handle_reg_frame_v2(msg.src_mesh_id, 
+                top_handle_reg_frame_v2(msg.src_mesh_id,
                                         msg.data + 5, msg.len - 5);
             } else {
                 // 数据帧: 重组 + 解压 + 转发
                 uint8_t *complete_data;
                 uint16_t complete_len;
-                
+
                 int ret = reassemble_l2_packet(msg.src_mesh_id,
                                                msg.data, msg.len,
                                                &complete_data, &complete_len);
@@ -1744,11 +1767,11 @@ void mesh_proto_task(void *arg) {
                     // 重组完成
                     uint8_t eth_frame[1600];
                     uint16_t eth_len;
-                    
+
                     l2_decapsulate_v6(complete_data, complete_len,
                                       eth_frame, &eth_len,
                                       msg.src_mesh_id, MESH_ADDR_TOP_NODE);
-                    
+
                     // 转发到以太网
                     forward_to_eth(eth_frame, eth_len);
                 }
@@ -1763,36 +1786,36 @@ void mesh_proto_task(void *arg) {
 ```c
 /**
  * @brief 以太网输入处理 (桥接 Hook)
- * 
+ *
  * 调用位置: 在 LwIP ethernet_input 之前
  */
 void ethernetif_input(void *arg) {
     struct netif *netif = (struct netif *)arg;
     struct pbuf *p;
-    
+
     while (1) {
         // 等待接收信号
         if (xSemaphoreTake(g_eth_rx_semaphore, portMAX_DELAY) == pdTRUE) {
             // 从驱动获取 pbuf
             p = low_level_input(netif);
             if (p == NULL) continue;
-            
+
             // ★ Hook: 检查是否需要桥接 ★
             bridge_action_t action = bridge_check_frame(p);
-            
+
             switch (action) {
                 case BRIDGE_TO_MESH:
                     // 转发到 Mesh
                     bridge_forward_to_mesh(p);
                     pbuf_free(p);  // 已转发，释放
                     break;
-                    
+
                 case BRIDGE_PROXY_ARP:
                     // 代理 ARP 回复
                     bridge_send_proxy_arp(p);
                     pbuf_free(p);
                     break;
-                    
+
                 case BRIDGE_LOCAL:
                 default:
                     // 交给本机 LwIP 处理
@@ -1817,36 +1840,36 @@ typedef enum {
 
 bridge_action_t bridge_check_frame(struct pbuf *p) {
     struct eth_hdr *eth = (struct eth_hdr *)p->payload;
-    
+
     // 检查目标 MAC
     if (is_broadcast_mac(eth->dest.addr)) {
         // 广播帧: 使用过滤器判断
         uint16_t dest_mesh;
         filter_action_t fa = filter_broadcast_frame_v6(
             p->payload, p->tot_len, &dest_mesh);
-        
+
         if (fa == FILTER_DROP) return BRIDGE_DROP;
         if (fa == FILTER_LOCAL) return BRIDGE_LOCAL;
-        
+
         // ARP 请求需要检查是否代答
         if (is_arp_request(p)) {
             ip4_addr_t target_ip;
             get_arp_target_ip(p, &target_ip);
-            
+
             if (node_table_is_ddc_ip(&target_ip)) {
                 return BRIDGE_PROXY_ARP;  // ★ 代答 ★
             }
         }
-        
+
         // 其他广播 (如 BACnet Who-Is): 转发
         return BRIDGE_TO_MESH;
     }
-    
+
     // 单播: 检查目标 MAC 是否在映射表
     if (node_table_is_ddc_mac(eth->dest.addr)) {
         return BRIDGE_TO_MESH;
     }
-    
+
     // 目标是本机
     return BRIDGE_LOCAL;
 }
@@ -1861,23 +1884,23 @@ bridge_action_t bridge_check_frame(struct pbuf *p) {
 void create_bridge_tasks(void) {
     // 创建队列
     g_uart_rx_queue = xQueueCreate(UART_RX_QUEUE_SIZE, sizeof(uart_rx_msg_t));
-    
+
     // UART 接收任务 (高优先级)
-    xTaskCreate(uart_rx_task, "uart_rx", 512, NULL, 
+    xTaskCreate(uart_rx_task, "uart_rx", 512, NULL,
                 configMAX_PRIORITIES - 1, NULL);
-    
+
     // Mesh 协议任务 (中优先级)
     xTaskCreate(mesh_proto_task, "mesh_proto", 1024, NULL,
                 configMAX_PRIORITIES - 2, NULL);
-    
+
     // 以太网输入任务 (中优先级, 通常由 LwIP netif 驱动)
     xTaskCreate(ethernetif_input, "eth_input", 1024, &g_eth_netif,
                 configMAX_PRIORITIES - 2, NULL);
-    
+
     // 维护任务 (低优先级)
     xTaskCreate(node_table_maintenance_task, "maint", 256, NULL,
                 tskIDLE_PRIORITY + 1, NULL);
-    
+
     // DDC 心跳任务 (仅 DDC 节点)
     if (!g_config.is_top_node) {
         xTaskCreate(ddc_heartbeat_task, "ddc_hb", 512, &g_ddc_config,
@@ -1895,7 +1918,7 @@ void create_bridge_tasks(void) {
 ```c
 /**
  * @brief 透传模式发送 (带流控)
- * 
+ *
  * 透传模式下模组没有返回值，需要靠延时保证不溢出
  */
 #define UART_BYTE_TIME_US    87   // 115200 波特率: 1字节约 87us
@@ -1904,30 +1927,30 @@ void create_bridge_tasks(void) {
 int tpmesh_send_transparent_safe(uint16_t dest_mesh_id,
                                  const uint8_t *data, uint16_t len) {
     if (len > 198) return -1;
-    
+
     uint8_t packet[200];
     packet[0] = (dest_mesh_id >> 8) & 0xFF;
     packet[1] = dest_mesh_id & 0xFF;
     memcpy(&packet[2], data, len);
-    
+
     uint16_t total_len = len + 2;
-    
+
     // 计算发送时间
     uint32_t tx_time_ms = (total_len * UART_BYTE_TIME_US) / 1000 + UART_TX_GUARD_MS;
-    
+
     // 获取发送锁 (防止并发)
     if (xSemaphoreTake(g_uart_tx_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return -2;  // 获取锁超时
     }
-    
+
     // 发送
     int ret = uart_write(packet, total_len);
-    
+
     // 等待发送完成 + 模组处理时间
     vTaskDelay(pdMS_TO_TICKS(tx_time_ms));
-    
+
     xSemaphoreGive(g_uart_tx_mutex);
-    
+
     return ret;
 }
 ```
@@ -1944,14 +1967,14 @@ int tpmesh_send_transparent_safe(uint16_t dest_mesh_id,
 
 bool tpmesh_wait_ready(void) {
     uint32_t start = xTaskGetTickCount();
-    
+
     while (gpio_read(TPMESH_BUSY_PIN) == GPIO_HIGH) {
         if ((xTaskGetTickCount() - start) > pdMS_TO_TICKS(BUSY_WAIT_TIMEOUT_MS)) {
             return false;  // 超时
         }
         vTaskDelay(pdMS_TO_TICKS(1));
     }
-    
+
     return true;
 }
 
@@ -1960,7 +1983,7 @@ int tpmesh_send_transparent_with_busy(uint16_t dest, const uint8_t *data, uint16
     if (!tpmesh_wait_ready()) {
         return -1;
     }
-    
+
     return tpmesh_send_transparent_safe(dest, data, len);
 }
 

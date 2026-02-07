@@ -98,6 +98,9 @@ static QueueHandle_t s_mesh_msg_queue = NULL;
 /** 初始化状态 */
 static bool s_initialized = false;
 
+/* DDC 注入本地协议栈使用的默认网卡 */
+extern struct netif *netif_default;
+
 /* ============================================================================
  * 私有函数声明
  * ============================================================================
@@ -317,12 +320,17 @@ int tpmesh_bridge_send_proxy_arp(struct pbuf *p) {
 
 void tpmesh_bridge_handle_mesh_data(uint16_t src_mesh_id, const uint8_t *data,
                                     uint16_t len) {
-  if (!s_initialized) {
+  if (!s_initialized || data == NULL || len == 0) {
+    return;
+  }
+
+  if (len < TPMESH_TUNNEL_HDR_LEN) {
+    tpmesh_debug_printf("TPMesh: Drop short mesh frame len=%u\n", len);
     return;
   }
 
   /* 检查是否为注册帧 */
-  if (len >= 1 && data[2] == SCHC_RULE_REGISTER) {
+  if (data[2] == SCHC_RULE_REGISTER) {
     process_register_frame(src_mesh_id, data + TPMESH_TUNNEL_HDR_LEN,
                            len - TPMESH_TUNNEL_HDR_LEN);
     return;
@@ -869,7 +877,18 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     }
   } else {
     /* DDC: 交给本地协议栈处理 */
-    /* TODO: 调用 LwIP 处理 */
+    struct netif *ddc_netif = netif_default;
+    if (ddc_netif && ddc_netif->input) {
+      struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
+      if (p) {
+        memcpy(p->payload, eth_frame, eth_len);
+        if (ddc_netif->input(p, ddc_netif) != ERR_OK) {
+          tpmesh_debug_printf("TPMesh DDC: netif input failed len=%u src=0x%04X\n",
+                              eth_len, src_mesh_id);
+          pbuf_free(p);
+        }
+      }
+    }
   }
 }
 

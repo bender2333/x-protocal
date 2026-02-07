@@ -45,6 +45,16 @@ extern "C" {
 /** 默认 AT 响应超时 (ms) */
 #define TPMESH_AT_TIMEOUT_MS 2000
 
+/** AT+SEND TYPE 默认值 */
+#ifndef TPMESH_AT_SEND_TYPE_DEFAULT
+#define TPMESH_AT_SEND_TYPE_DEFAULT 0
+#endif
+
+/** 默认功耗模式 LP */
+#ifndef TPMESH_AT_LP_DEFAULT
+#define TPMESH_AT_LP_DEFAULT 0
+#endif
+
 /** AT+SEND 后最大有效载荷 */
 #ifndef TPMESH_MTU
 #define TPMESH_MTU 200
@@ -184,7 +194,7 @@ void tpmesh_at_set_route_cb(tpmesh_route_cb_t cb);
 /**
  * @brief 初始化 TPMesh 模组 (发送 AT 命令序列)
  *
- * 发送: AT -> AT+ADDR -> AT+CELL -> AT+TYPE -> AT+NNMI
+ * 发送: AT -> AT+ADDR -> AT+CELL -> AT+TYPE -> AT+LP -> AT+NNMI
  *
  * @param mesh_id 本机 Mesh ID
  * @param is_top_node true=Center, false=Ordinary
