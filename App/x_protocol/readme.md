@@ -2095,3 +2095,13 @@ Key points:
 - Root cause in this project: `.init_array/.fini_array` ended up in the same executable `FLASH` load segment and kept writable flags in ELF metadata.
 - Mitigation: in linker script `XC8064/proj/gd32f5xx_flash.ld`, split FLASH load segments with explicit `PHDRS` (`text` vs `ro`) and keep `.preinit_array/.init_array/.fini_array` in the non-executable `ro` segment.
 - Scope: this only changes ELF segment permission metadata (remove RWX warning); runtime memory layout and startup flow stay unchanged.
+
+---
+
+## 12. Bridge/ARP Workflow Guardrails (2026-02-08)
+
+- Bridge input must not assume `pbuf` payload is contiguous.
+- Ethernet frame parsing and SCHC compression must use a linearized buffer (`pbuf_copy_partial`) before reading headers/body.
+- Proxy ARP must only reply for nodes that are both `known` and `online`.
+- Unicast forwarding to mesh must only happen for nodes that are both `known` and `online`; offline targets are dropped to avoid stale-map blackholes.
+- Implementation note: enforce these checks in `tpmesh_eth_input_hook()` as a single ingress policy layer, then call existing bridge APIs with contiguous frame copies.
