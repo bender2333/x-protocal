@@ -325,27 +325,12 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
     return -3;
   }
 
-  /* 设置节点类型 */
-  r = tpmesh_at_cmd(is_top_node ? "AT+TYPE=CENTER" : "AT+TYPE=ORDINARY",
-                    TPMESH_AT_TIMEOUT_MS);
-  if (r != AT_RESP_OK) {
-    tpmesh_debug_printf("Module: TYPE failed\n");
-    return -4;
-  }
-
   /* 设置功耗模式 */
   snprintf(cmd, sizeof(cmd), "AT+LP=%u", (unsigned)TPMESH_AT_LP_DEFAULT);
   r = tpmesh_at_cmd(cmd, TPMESH_AT_TIMEOUT_MS);
   if (r != AT_RESP_OK) {
     tpmesh_debug_printf("Module: LP failed\n");
-    return -5;
-  }
-
-  /* 开启 NNMI 上报 */
-  r = tpmesh_at_cmd("AT+NNMI=1", TPMESH_AT_TIMEOUT_MS);
-  if (r != AT_RESP_OK) {
-    tpmesh_debug_printf("Module: NNMI failed\n");
-    return -6;
+    return -4;
   }
 
   tpmesh_debug_printf("Module: Init OK\n");
@@ -353,7 +338,7 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
 }
 
 void tpmesh_module_reset(void) {
-  tpmesh_at_cmd_no_wait("AT+RST");
+  tpmesh_at_cmd_no_wait("AT+REBOOT");
   /* 等待模组重启 - 调用者需自行延时 */
 }
 

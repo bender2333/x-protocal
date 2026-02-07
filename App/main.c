@@ -186,34 +186,34 @@ void FuncBlock_Task(void *pvParameters) {
  * 在 FreeRTOS 调度器启动后运行，确保 tcpip 线程已就绪
  * 定时发布设备状态消息
  */
-void mqtt_client_task(void *pvParameters) {
-  (void)pvParameters;
-  uint32_t msg_count = 0;
-  char msg_buf[128];
+// void mqtt_client_task(void *pvParameters) {
+//   (void)pvParameters;
+//   uint32_t msg_count = 0;
+//   char msg_buf[128];
 
-  /* 等待一段时间确保网络初始化完成 */
-  vTaskDelay(pdMS_TO_TICKS(3000));
+//   /* 等待一段时间确保网络初始化完成 */
+//   vTaskDelay(pdMS_TO_TICKS(3000));
 
-  /* 初始化 MQTT 客户端 */
-  mqtt_init();
+//   // /* 初始化 MQTT 客户端 */
+//   // mqtt_init();
 
-  /* 等待连接建立 */
-  vTaskDelay(pdMS_TO_TICKS(2000));
+//   /* 等待连接建立 */
+//   vTaskDelay(pdMS_TO_TICKS(2000));
 
-  for (;;) {
-    /* 构造动态消息内容 */
-    msg_count++;
-    snprintf(msg_buf, sizeof(msg_buf),
-             "{\"device\":\"XC8064\",\"count\":%lu,\"status\":\"online\"}",
-             (unsigned long)msg_count);
+//   for (;;) {
+//     /* 构造动态消息内容 */
+//     msg_count++;
+//     snprintf(msg_buf, sizeof(msg_buf),
+//              "{\"device\":\"XC8064\",\"count\":%lu,\"status\":\"online\"}",
+//              (unsigned long)msg_count);
 
-    /* 发布到指定 topic */
-    mqtt_publish_wrapper("DDC_TEST/status", msg_buf);
+//     /* 发布到指定 topic */
+//     mqtt_publish_wrapper("DDC_TEST/status", msg_buf);
 
-    /* 每 5 秒发布一次 */
-    vTaskDelay(pdMS_TO_TICKS(5000));
-  }
-}
+//     /* 每 5 秒发布一次 */
+//     vTaskDelay(pdMS_TO_TICKS(5000));
+//   }
+// }
 
 #include "lwip/sys.h"
 #include "lwiperf.h"
@@ -339,7 +339,7 @@ int main(void) {
               NULL);
 
   /* HTTP server (需要取消注释以启用) */
-  http_server_netconn_init();
+  // http_server_netconn_init();
 
   /* MQTT 客户端任务 - 在调度器启动后执行初始化 */
   // xTaskCreate(mqtt_client_task, "mqtt_client", 0x800, NULL,

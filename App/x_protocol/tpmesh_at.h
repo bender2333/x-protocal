@@ -194,11 +194,11 @@ void tpmesh_at_set_route_cb(tpmesh_route_cb_t cb);
 /**
  * @brief 初始化 TPMesh 模组 (发送 AT 命令序列)
  *
- * 发送: AT -> AT+ADDR -> AT+CELL -> AT+TYPE -> AT+LP -> AT+NNMI
+ * 发送: AT -> AT+ADDR -> AT+CELL -> AT+LP
  *
  * @param mesh_id 本机 Mesh ID
- * @param is_top_node true=Center, false=Ordinary
- * @return 0=成功, <0=失败(-1=AT,-2=ADDR,-3=CELL,-4=TYPE,-5=NNMI)
+ * @param is_top_node 节点角色信息(当前仅用于日志)
+ * @return 0=成功, <0=失败(-1=AT,-2=ADDR,-3=CELL,-4=LP)
  */
 int tpmesh_module_init(uint16_t mesh_id, bool is_top_node);
 

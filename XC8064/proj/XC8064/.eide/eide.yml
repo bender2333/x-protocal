@@ -204,16 +204,6 @@ virtualFolder:
             - path: ../../../App/FuncBlockFB/timing.h
             - path: ../../../App/FuncBlockFB/types.h
           folders: []
-        - name: xlsot
-          files:
-            - path: ../../../App/Xslot/httpserver-netconn.c
-            - path: ../../../App/Xslot/mqtt.c
-            - path: ../../../App/Xslot/mqtt_app.c
-            - path: ../../../App/Xslot/at_passthrough.c
-            - path: ../../../App/Xslot/communication.h
-            - path: ../../../App/Xslot/communication_task.c
-            - path: ../../../App/Xslot/mdns_discovery.c
-          folders: []
         - name: x_protocal
           files:
             - path: ../../../App/x_protocol/node_table.c
