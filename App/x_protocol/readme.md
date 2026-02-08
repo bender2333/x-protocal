@@ -2104,4 +2104,4 @@ Key points:
 - Ethernet frame parsing and SCHC compression must use a linearized buffer (`pbuf_copy_partial`) before reading headers/body.
 - Proxy ARP must only reply for nodes that are both `known` and `online`.
 - Unicast forwarding to mesh must only happen for nodes that are both `known` and `online`; offline targets are dropped to avoid stale-map blackholes.
-- Implementation note: enforce these checks in `tpmesh_eth_input_hook()` as a single ingress policy layer, then call existing bridge APIs with contiguous frame copies.
+- Implementation note (v0.7.1): sink ingress safety policy into `tpmesh_bridge.c` (`tpmesh_bridge_check/forward/proxy_arp`) so `tpmesh_eth_input_hook()` only dispatches actions and no longer duplicates frame-parse logic.

@@ -119,8 +119,10 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
 static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
                                uint16_t len);
 static void send_garp(const uint8_t *mac, const ip4_addr_t *ip);
-static bridge_action_t check_arp_request(struct pbuf *p,
-                                         const uint8_t **target_ip);
+static bool pbuf_copy_exact(struct pbuf *p, uint16_t offset, void *dst,
+                            uint16_t len);
+static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out);
+static bridge_action_t check_arp_request(struct pbuf *p);
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
                                          const uint8_t *target_mac,
                                          const ip4_addr_t *target_ip);
@@ -206,119 +208,140 @@ int tpmesh_ddc_init(const ddc_config_t *config) {
  */
 
 bridge_action_t tpmesh_bridge_check(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node || p->len < ETH_HDR_LEN) {
+  if (!s_initialized || !s_is_top_node || p == NULL ||
+      p->tot_len < SIZEOF_ETH_HDR) {
     return BRIDGE_LOCAL;
   }
-
-  struct eth_hdr *eth = (struct eth_hdr *)p->payload;
-  uint16_t ethertype = lwip_ntohs(eth->type);
-
-  /* 检查目标 MAC */
-  bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
-
+  struct eth_hdr eth_hdr;
+  if (!pbuf_copy_exact(p, 0, &eth_hdr, SIZEOF_ETH_HDR)) {
+    return BRIDGE_LOCAL;
+  }
+  uint16_t ethertype = lwip_ntohs(eth_hdr.type);
+  bool is_broadcast = schc_is_broadcast_mac((const uint8_t *)&eth_hdr.dest);
   if (is_broadcast) {
-    /* 广播帧处理 */
     if (ethertype == ETHTYPE_ARP) {
-      /* ARP 广播 - 检查是否需要代理应答 */
-      const uint8_t *target_ip;
-      bridge_action_t action = check_arp_request(p, &target_ip);
-      return action;
+      return check_arp_request(p);
     }
-
     if (ethertype == ETHTYPE_IP) {
-      /* IP 广播 - 检查 UDP 端口 */
-      if (p->len >= ETH_HDR_LEN + IP_HDR_LEN + UDP_HDR_LEN) {
-        struct ip_hdr *iph =
-            (struct ip_hdr *)((uint8_t *)p->payload + ETH_HDR_LEN);
-        if (IPH_PROTO(iph) == IP_PROTO_UDP) {
-          struct udp_hdr *udph =
-              (struct udp_hdr *)((uint8_t *)iph + IPH_HL_BYTES(iph));
-          uint16_t dst_port = lwip_ntohs(udph->dest);
-
-          if (dst_port == TPMESH_PORT_BACNET) {
-            /* BACnet 广播 (Who-Is) - 转发到 Mesh */
+      if (p->tot_len >= (SIZEOF_ETH_HDR + IP_HLEN + UDP_HLEN)) {
+        uint8_t l3_hdr_buf[SIZEOF_ETH_HDR + IP_HLEN_MAX + UDP_HLEN];
+        uint16_t copy_len = (uint16_t)sizeof(l3_hdr_buf);
+        if (p->tot_len < copy_len) {
+          copy_len = p->tot_len;
+        }
+        if (!pbuf_copy_exact(p, 0, l3_hdr_buf, copy_len)) {
+          return BRIDGE_DROP;
+        }
+        struct ip_hdr *iph = (struct ip_hdr *)(l3_hdr_buf + SIZEOF_ETH_HDR);
+        uint16_t ihl = IPH_HL_BYTES(iph);
+        if (ihl >= IP_HLEN && ihl <= IP_HLEN_MAX &&
+            (SIZEOF_ETH_HDR + ihl + UDP_HLEN) <= copy_len &&
+            IPH_PROTO(iph) == IP_PROTO_UDP) {
+          struct udp_hdr *udph = (struct udp_hdr *)((uint8_t *)iph + ihl);
+          if (lwip_ntohs(udph->dest) == TPMESH_PORT_BACNET) {
             return BRIDGE_TO_MESH;
           }
         }
       }
     }
-
-    /* 其他广播 - 丢弃 (DHCP, NetBIOS 等) */
     return BRIDGE_DROP;
   }
-
-  /* 单播帧 */
-  uint8_t *dst_mac = (uint8_t *)&eth->dest;
-
-  /* 检查是否发给 DDC */
-  if (node_table_is_ddc_mac(dst_mac)) {
-    return BRIDGE_TO_MESH;
+  uint16_t dst_mesh_id =
+      node_table_get_mesh_by_mac((const uint8_t *)&eth_hdr.dest);
+  if (dst_mesh_id == MESH_ADDR_INVALID) {
+    return BRIDGE_LOCAL;
   }
-
-  /* 发给本机 */
-  return BRIDGE_LOCAL;
+  return node_table_is_online(dst_mesh_id) ? BRIDGE_TO_MESH : BRIDGE_DROP;
 }
 
 int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node) {
+  if (!s_initialized || !s_is_top_node || p == NULL ||
+      p->tot_len < SIZEOF_ETH_HDR) {
     return -1;
   }
   if (!tpmesh_at_is_uart6_active()) {
     return -5;
   }
-
-  struct eth_hdr *eth = (struct eth_hdr *)p->payload;
+  int ret = 0;
+  struct pbuf *contig = NULL;
+  struct pbuf *frame = p;
+  if (p->len < p->tot_len) {
+    if (!clone_pbuf_contiguous(p, &contig)) {
+      return -6;
+    }
+    frame = contig;
+  }
+  struct eth_hdr *eth = (struct eth_hdr *)frame->payload;
   bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
-
-  /* SCHC 压缩 */
   uint8_t tunnel_buf[1600];
   uint16_t tunnel_len;
-
-  if (schc_compress((uint8_t *)p->payload, p->tot_len, tunnel_buf, &tunnel_len,
-                    is_broadcast) != 0) {
-    return -2;
+  if (schc_compress((uint8_t *)frame->payload, frame->tot_len, tunnel_buf,
+                    &tunnel_len, is_broadcast) != 0) {
+    ret = -2;
+    goto out;
   }
-
-  /* 确定目标 Mesh ID */
   uint16_t dest_mesh_id;
   if (is_broadcast) {
-    /* 广播限速检查 */
     if (!broadcast_rate_check()) {
       tpmesh_debug_printf("TPMesh: Broadcast rate limited\n");
-      return -3;
+      ret = -3;
+      goto out;
     }
     dest_mesh_id = MESH_ADDR_BROADCAST;
   } else {
     dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
-    if (dest_mesh_id == MESH_ADDR_INVALID) {
-      tpmesh_debug_printf("TPMesh: Unknown destination MAC\n");
-      return -4;
+    if (dest_mesh_id == MESH_ADDR_INVALID || !node_table_is_online(dest_mesh_id)) {
+      tpmesh_debug_printf("TPMesh: destination node unavailable\n");
+      ret = -4;
+      goto out;
     }
   }
-
-  /* 分片发送 */
-  return fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
+  ret = fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
+out:
+  if (contig != NULL) {
+    pbuf_free(contig);
+  }
+  return ret;
 }
 
 int tpmesh_bridge_send_proxy_arp(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node) {
+  if (!s_initialized || !s_is_top_node || p == NULL ||
+      p->tot_len < (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
     return -1;
   }
-
-  /* 解析 ARP 请求 */
+  struct pbuf *contig = NULL;
+  struct pbuf *frame = p;
+  if (p->len < p->tot_len) {
+    if (!clone_pbuf_contiguous(p, &contig)) {
+      return -3;
+    }
+    frame = contig;
+  }
+  int ret = 0;
   struct etharp_hdr *arp =
-      (struct etharp_hdr *)((uint8_t *)p->payload + SIZEOF_ETH_HDR);
-
+      (struct etharp_hdr *)((uint8_t *)frame->payload + SIZEOF_ETH_HDR);
+  if (arp->opcode != PP_HTONS(ARP_REQUEST)) {
+    ret = -2;
+    goto out;
+  }
   ip4_addr_t target_ip;
   SMEMCPY(&target_ip, &arp->dipaddr, sizeof(ip4_addr_t));
-
-  /* 获取目标 DDC 的 MAC */
+  uint16_t mesh_id = node_table_get_mesh_by_ip(&target_ip);
+  if (mesh_id == MESH_ADDR_INVALID || !node_table_is_online(mesh_id)) {
+    ret = -2;
+    goto out;
+  }
   uint8_t target_mac[6];
   if (node_table_get_mac_by_ip(&target_ip, target_mac) != 0) {
-    return -2;
+    ret = -2;
+    goto out;
   }
-
-  return send_proxy_arp_reply_internal(p, target_mac, &target_ip);
+  ret = send_proxy_arp_reply_internal(frame, target_mac, &target_ip);
+out:
+  if (contig != NULL) {
+    pbuf_free(contig);
+  }
+  return ret;
 }
 
 void tpmesh_bridge_handle_mesh_data(uint16_t src_mesh_id, const uint8_t *data,
@@ -953,30 +976,49 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
  * ============================================================================
  */
 
-static bridge_action_t check_arp_request(struct pbuf *p,
-                                         const uint8_t **target_ip) {
-  if (p->len < SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR) {
+static bool pbuf_copy_exact(struct pbuf *p, uint16_t offset, void *dst,
+                            uint16_t len) {
+  if (p == NULL || dst == NULL) {
+    return false;
+  }
+  return pbuf_copy_partial(p, dst, len, offset) == len;
+}
+
+static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out) {
+  if (src == NULL || out == NULL || src->tot_len == 0) {
+    return false;
+  }
+  struct pbuf *cpy = pbuf_alloc(PBUF_RAW, src->tot_len, PBUF_RAM);
+  if (cpy == NULL) {
+    return false;
+  }
+  if (!pbuf_copy_exact(src, 0, cpy->payload, src->tot_len)) {
+    pbuf_free(cpy);
+    return false;
+  }
+  *out = cpy;
+  return true;
+}
+
+static bridge_action_t check_arp_request(struct pbuf *p) {
+  if (p == NULL || p->tot_len < (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
     return BRIDGE_LOCAL;
   }
-
-  struct etharp_hdr *arp =
-      (struct etharp_hdr *)((uint8_t *)p->payload + SIZEOF_ETH_HDR);
-
-  /* 只处理 ARP 请求 */
+  uint8_t arp_hdr_buf[SIZEOF_ETHARP_HDR];
+  if (!pbuf_copy_exact(p, SIZEOF_ETH_HDR, arp_hdr_buf, SIZEOF_ETHARP_HDR)) {
+    return BRIDGE_LOCAL;
+  }
+  const struct etharp_hdr *arp = (const struct etharp_hdr *)arp_hdr_buf;
   if (arp->opcode != PP_HTONS(ARP_REQUEST)) {
     return BRIDGE_LOCAL;
   }
-
-  /* 检查目标 IP 是否为 DDC */
   ip4_addr_t target;
   SMEMCPY(&target, &arp->dipaddr, sizeof(ip4_addr_t));
-
-  if (node_table_is_ddc_ip(&target)) {
-    *target_ip = (const uint8_t *)&arp->dipaddr;
-    return BRIDGE_PROXY_ARP;
+  uint16_t mesh_id = node_table_get_mesh_by_ip(&target);
+  if (mesh_id == MESH_ADDR_INVALID) {
+    return BRIDGE_LOCAL;
   }
-
-  return BRIDGE_LOCAL;
+  return node_table_is_online(mesh_id) ? BRIDGE_PROXY_ARP : BRIDGE_DROP;
 }
 
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,

@@ -42,105 +42,6 @@ static TaskHandle_t s_at_rx_task_handle = NULL;
 static TaskHandle_t s_bridge_task_handle = NULL;
 static TaskHandle_t s_heartbeat_task_handle = NULL;
 
-static bool tpmesh_clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out);
-static bridge_action_t tpmesh_eth_bridge_check_safe(struct pbuf *p);
-
-static bool tpmesh_clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out) {
-  if (src == NULL || out == NULL || src->tot_len == 0) {
-    return false;
-  }
-
-  struct pbuf *cpy = pbuf_alloc(PBUF_RAW, src->tot_len, PBUF_RAM);
-  if (cpy == NULL) {
-    return false;
-  }
-
-  if (pbuf_copy_partial(src, cpy->payload, src->tot_len, 0) != src->tot_len) {
-    pbuf_free(cpy);
-    return false;
-  }
-
-  *out = cpy;
-  return true;
-}
-
-static bridge_action_t tpmesh_eth_bridge_check_safe(struct pbuf *p) {
-  if (p == NULL || p->tot_len < SIZEOF_ETH_HDR) {
-    return BRIDGE_LOCAL;
-  }
-
-  uint8_t eth_hdr_buf[SIZEOF_ETH_HDR];
-  if (pbuf_copy_partial(p, eth_hdr_buf, SIZEOF_ETH_HDR, 0) != SIZEOF_ETH_HDR) {
-    return BRIDGE_LOCAL;
-  }
-
-  struct eth_hdr *eth = (struct eth_hdr *)eth_hdr_buf;
-  uint16_t ethertype = lwip_ntohs(eth->type);
-  bool is_broadcast = tpmesh_is_broadcast_mac((const uint8_t *)&eth->dest);
-
-  if (is_broadcast) {
-    if (ethertype == ETHTYPE_ARP) {
-      if (p->tot_len < (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
-        return BRIDGE_LOCAL;
-      }
-
-      uint8_t arp_hdr_buf[SIZEOF_ETHARP_HDR];
-      if (pbuf_copy_partial(p, arp_hdr_buf, SIZEOF_ETHARP_HDR, SIZEOF_ETH_HDR) !=
-          SIZEOF_ETHARP_HDR) {
-        return BRIDGE_LOCAL;
-      }
-
-      struct etharp_hdr *arp = (struct etharp_hdr *)arp_hdr_buf;
-      if (arp->opcode != PP_HTONS(ARP_REQUEST)) {
-        return BRIDGE_LOCAL;
-      }
-
-      ip4_addr_t target_ip;
-      memcpy(&target_ip, &arp->dipaddr, sizeof(ip4_addr_t));
-      uint16_t mesh_id = node_table_get_mesh_by_ip(&target_ip);
-      if (mesh_id == MESH_ADDR_INVALID) {
-        return BRIDGE_LOCAL;
-      }
-
-      return node_table_is_online(mesh_id) ? BRIDGE_PROXY_ARP : BRIDGE_DROP;
-    }
-
-    if (ethertype == ETHTYPE_IP) {
-      if (p->tot_len >= (SIZEOF_ETH_HDR + IP_HDR_LEN + UDP_HDR_LEN)) {
-        uint8_t l3_hdr_buf[SIZEOF_ETH_HDR + 80];
-        uint16_t copy_len = (uint16_t)sizeof(l3_hdr_buf);
-        if (p->tot_len < copy_len) {
-          copy_len = p->tot_len;
-        }
-
-        if (pbuf_copy_partial(p, l3_hdr_buf, copy_len, 0) != copy_len) {
-          return BRIDGE_DROP;
-        }
-
-        struct ip_hdr *iph = (struct ip_hdr *)(l3_hdr_buf + SIZEOF_ETH_HDR);
-        uint16_t ihl = IPH_HL_BYTES(iph);
-        if (ihl >= IP_HDR_LEN &&
-            (SIZEOF_ETH_HDR + ihl + UDP_HDR_LEN) <= copy_len &&
-            IPH_PROTO(iph) == IP_PROTO_UDP) {
-          struct udp_hdr *udph = (struct udp_hdr *)((uint8_t *)iph + ihl);
-          if (lwip_ntohs(udph->dest) == TPMESH_PORT_BACNET) {
-            return BRIDGE_TO_MESH;
-          }
-        }
-      }
-    }
-
-    return BRIDGE_DROP;
-  }
-
-  uint16_t dst_mesh_id = node_table_get_mesh_by_mac((const uint8_t *)&eth->dest);
-  if (dst_mesh_id == MESH_ADDR_INVALID) {
-    return BRIDGE_LOCAL;
-  }
-
-  return node_table_is_online(dst_mesh_id) ? BRIDGE_TO_MESH : BRIDGE_DROP;
-}
-
 /* ============================================================================
  * 公共函数
  * ============================================================================
@@ -310,29 +211,15 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
     return false;
   }
 
-  /* Safe ingress policy: no contiguous pbuf assumption + online-node filter. */
-  bridge_action_t action = tpmesh_eth_bridge_check_safe(p);
+  /* Ingress policy is implemented in bridge module. */
+  bridge_action_t action = tpmesh_bridge_check(p);
 
   switch (action) {
-  case BRIDGE_TO_MESH: {
-    struct pbuf *tx = NULL;
-    if (!tpmesh_clone_pbuf_contiguous(p, &tx)) {
-      return false;
-    }
-    int ret = tpmesh_bridge_forward_to_mesh(tx);
-    pbuf_free(tx);
-    return (ret == 0);
-  }
+  case BRIDGE_TO_MESH:
+    return (tpmesh_bridge_forward_to_mesh(p) == 0);
 
-  case BRIDGE_PROXY_ARP: {
-    struct pbuf *arp_req = NULL;
-    if (!tpmesh_clone_pbuf_contiguous(p, &arp_req)) {
-      return false;
-    }
-    int ret = tpmesh_bridge_send_proxy_arp(arp_req);
-    pbuf_free(arp_req);
-    return (ret == 0);
-  }
+  case BRIDGE_PROXY_ARP:
+    return (tpmesh_bridge_send_proxy_arp(p) == 0);
 
   case BRIDGE_DROP:
     return true;
