@@ -2150,3 +2150,40 @@ This section supersedes ambiguous earlier descriptions and is the source of trut
 - `schc_get_rule()` no longer applies `SCHC_RULE_IP_ONLY` to non-UDP IPv4 packets. Non-UDP traffic falls back to `SCHC_RULE_NO_COMPRESS`.
 - IPv4 options compatibility: if IPv4 IHL is not 20 bytes, compression falls back to `SCHC_RULE_NO_COMPRESS` to avoid header misalignment.
 - `tpmesh_eth_input_hook()` is fail-closed for `BRIDGE_TO_MESH` and `BRIDGE_PROXY_ARP`: once bridge policy selects these actions, frame will not fall back into local LwIP stack even if forwarding fails.
+
+---
+
+## 15. Dataflow Closure Fixes (2026-02-08)
+
+This section clarifies implementation constraints required for Top/Edge end-to-end closure under packet loss, reboot, and large-payload cases.
+
+### 15.1 Fragmentation/Reassembly Contract
+
+- All mesh fragments (including non-first fragments) use unified tunnel format:
+  `[L2_HDR][FRAG_HDR][RULE_ID][payload...]`.
+- `FRAG_HDR` is always parsed at byte offset `1`; no short-fragment special format is allowed.
+- Reassembly behavior:
+  - `seq=0`: copy full tunnel frame.
+  - `seq>0`: append only payload bytes after tunnel header (`TPMESH_TUNNEL_HDR_LEN`).
+- Oversized UART URC payload (`len > TPMESH_MTU`) must be dropped explicitly, not truncated silently.
+
+### 15.2 Top/Edge Registration and Heartbeat Recovery
+
+- Top node treats both `REGISTER` and `HEARTBEAT` as authoritative presence updates:
+  heartbeat from an unknown node triggers table refresh/update instead of only `touch`.
+- Edge node maintains heartbeat ACK watchdog:
+  - after sending heartbeat, it waits for ACK within timeout;
+  - consecutive misses above threshold force state back to `REGISTERING`.
+- Register ACK and heartbeat ACK from Top refresh Edge-side node table entry for Top (`mesh/mac/ip`), ensuring SCHC decompression uses valid L2/L3 identities.
+
+### 15.3 Node Table Bootstrap Rules
+
+- On role init, local node identity (`self mesh/mac/ip`) is inserted as static entry.
+- On Edge, Top entry is updated from register/heartbeat ACK payload once available.
+- This guarantees SCHC decompression does not fall back to placeholder IP/MAC in normal operation.
+
+### 15.4 Edge PHY Input Isolation
+
+- Edge mode (`TPMESH_MODE_DDC`) does not consume PHY RX frames in `main_task`.
+- Top and non-TPMesh modes keep original PHY RX polling path unchanged.
+- This preserves role separation: Edge TX/RX data path is `LwIP stack <-> Mesh bridge`, while Top remains `PHY <-> Mesh bridge`.

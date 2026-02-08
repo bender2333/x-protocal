@@ -39,6 +39,12 @@ extern "C" {
 /** 心跳间隔 (ms) */
 #define TPMESH_HEARTBEAT_MS 30000
 
+/** 心跳 ACK 超时 (ms) */
+#define TPMESH_HEARTBEAT_ACK_TIMEOUT_MS 10000
+
+/** 连续丢失心跳 ACK 阈值 */
+#define TPMESH_HEARTBEAT_MISS_MAX 3
+
 /** 注册重试间隔 (ms) */
 #define TPMESH_REGISTER_RETRY_MS 5000
 
