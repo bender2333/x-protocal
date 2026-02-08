@@ -111,6 +111,30 @@
 2. 构造 `pbuf`。
 3. 调用 `netif_default->input(p, netif_default)` 注入本地栈。
 
+### 5.6 关键业务场景流（补充）
+
+#### 5.6.1 BMS -> DDC 单播 UDP
+
+1. BMS 发送单播以太网帧到 Top（目标 MAC 为 DDC MAC）。
+2. Top `tpmesh_bridge_check()` 判定 `BRIDGE_TO_MESH`。
+3. Top 进行隧道封装 + SCHC 压缩（可压缩时）并分片发送到目标 DDC mesh_id。
+4. DDC 重组并解压后注入本地 `netif->input`。
+
+#### 5.6.2 BMS Who-Is 广播 -> DDC I-Am 广播
+
+1. BMS 发送 BACnet Who-Is 广播帧。
+2. Top 判定广播可转发并执行限速。
+3. Top 压缩封装后广播到 Mesh。
+4. DDC 解压后本地 BACnet 栈收到 Who-Is 并产生 I-Am 广播。
+5. DDC 将 I-Am 通过 Mesh 回传 Top，Top 解压并从物理网卡广播发出。
+
+#### 5.6.3 ARP 代理流程（BMS 发现 DDC）
+
+1. BMS 对 DDC IP 发送 ARP Request。
+2. Top 查询 node table。
+3. 若目标节点 `known + online`，Top 直接发送 Proxy ARP Reply（源 MAC=DDC MAC）。
+4. 若未知/离线，Top 不代理并丢弃（等待注册/心跳恢复）。
+
 ## 6. 报文与协议策略
 
 ### 6.1 隧道头与分片契约（统一格式）
@@ -139,6 +163,39 @@
 
 - Top 对目标为已知且在线 DDC 的 ARP 请求执行 Proxy ARP。
 - 未知或离线条目不代理，避免错误响应与黑洞。
+
+### 6.4 AT+SEND / +NNMI 格式
+
+- 发送命令：`AT+SEND=<DEST>,<LEN>,<HEX_DATA>,<TYPE>`
+- 接收 URC（优先）：`+NNMI:<SRC>,<DEST>,<RSSI>,<LEN>,<HEX_DATA>`
+- 接收 URC（兼容）：`+NNMI:<SRC>,<LEN>,<HEX_DATA>`
+- 约束：`LEN <= TPMESH_MTU`，超出直接拒绝或丢弃。
+
+### 6.5 注册/心跳控制帧格式（`SCHC_RULE_REGISTER`）
+
+- 载荷结构：
+  - `frame_type:1`
+  - `mac:6`
+  - `ip:4`（网络序）
+  - `mesh_id:2`
+  - `crc16:2`
+- 控制类型：
+  - `0x01` Register
+  - `0x02` Register ACK
+  - `0x03` Heartbeat
+  - `0x04` Heartbeat ACK
+
+### 6.6 隧道数据帧格式（按 Rule）
+
+- 通用头：`[L2_HDR:1][FRAG_HDR:1][RULE_ID:1][PAYLOAD:N]`
+- `RULE_ID=0x00` (`NO_COMPRESS`)：
+  - `PAYLOAD=[SRC_MAC:6][DST_MAC:6][ETHERTYPE+L3+L4+DATA]`
+- `RULE_ID=0x01` (`BACNET_IP`)：
+  - `PAYLOAD=[SRC_MAC:6][UDP_PAYLOAD]`
+  - IPv4/UDP 头在解压时重建。
+- `RULE_ID=0x02` (`IP_ONLY`)：
+  - `PAYLOAD=[SRC_MAC:6][IP_PAYLOAD]`
+  - 仅在满足规则时使用，否则回退 `NO_COMPRESS`。
 
 ## 7. UART6 接管模型（最终）
 
@@ -254,3 +311,19 @@ UART API（`tpmesh_uart.h`）：
 - 架构变更先更新本文档，再改代码。
 - 任何新增接口需在对应头文件声明，并在本文档 API 契约补充。
 - 旧文档仅保留跳转入口，避免多处事实源漂移。
+
+## 14. 变更历史（合并）
+
+| 版本 | 日期 | 关键变更 |
+|---|---|---|
+| V0.3 | 2026-02-03 | 引入 Proxy ARP 架构 |
+| V0.4 | 2026-02-03 | L2 隧道桥接 + 广播过滤 |
+| V0.5 | 2026-02-03 | MAC 与 Mesh ID 解耦，节点映射表 |
+| V0.6 | 2026-02-03 | DDC 主动注册 + 重传状态机；Top 代答 ARP + GARP；SCHC；广播限速 |
+| V0.6.1 | 2026-02-03 | 补充 Who-Is/I-Am 流程；DDC 广播处理；Top 转发 DDC 广播 |
+| V0.7 | 2026-02-07 | AT+SEND/NNMI 对齐；任务与数据链路闭环对齐实现 |
+| V0.7.1 | 2026-02-08 | Bridge/ARP 工作流下沉与安全收敛 |
+| V0.8 | 2026-02-08 | UART6 takeover 模型纳入主架构 |
+| V0.8.1 | 2026-02-08 | SCHC 边界检查、IHL 回退、hook fail-closed |
+| V0.8.2 | 2026-02-08 | 分片契约统一、Top/Edge 数据流闭环修复 |
+| V0.8.3 | 2026-02-08 | UART6 收敛为单向接管 + 重启模型 |
