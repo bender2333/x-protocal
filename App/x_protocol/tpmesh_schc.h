@@ -112,7 +112,8 @@ int schc_compress(const uint8_t *eth_frame, uint16_t eth_len, uint8_t *out_data,
  * @return 0=成功
  */
 int schc_decompress(const uint8_t *mesh_data, uint16_t mesh_len,
-                    uint8_t *out_frame, uint16_t *out_len, uint16_t src_mesh_id,
+                    uint8_t *out_frame, uint16_t out_frame_size,
+                    uint16_t *out_len, uint16_t src_mesh_id,
                     uint16_t dst_mesh_id);
 
 /* ============================================================================
@@ -143,8 +144,9 @@ uint16_t schc_get_compression_savings(uint8_t rule_id);
  * @param rule_id [out] 规则 ID
  * @return 头部长度
  */
-int schc_parse_tunnel_header(const uint8_t *data, uint8_t *l2_hdr,
-                             uint8_t *frag_hdr, uint8_t *rule_id);
+int schc_parse_tunnel_header(const uint8_t *data, uint16_t data_len,
+                             uint8_t *l2_hdr, uint8_t *frag_hdr,
+                             uint8_t *rule_id);
 
 /**
  * @brief 检查是否为广播 MAC

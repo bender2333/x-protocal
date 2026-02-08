@@ -64,6 +64,9 @@ void ethernetif_input(void *pvParameters)
 }
 ```
 
+> Note (2026-02-08): `tpmesh_eth_input_hook()` is fail-closed for bridge-owned actions.
+> If policy returns `BRIDGE_TO_MESH` or `BRIDGE_PROXY_ARP`, the frame is considered consumed even when bridge send fails, and will not fall back to local `netif->input`.
+
 **已添加获取 netif 函数:**
 
 ```c

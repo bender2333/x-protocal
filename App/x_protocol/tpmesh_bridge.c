@@ -17,6 +17,7 @@
 /* node_table.h 已通过 tpmesh_bridge.h 包含 */
 #include "FreeRTOS.h"
 #include "lwip/etharp.h"
+#include "lwip/err.h"
 #include "lwip/ip.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
@@ -60,6 +61,7 @@ typedef struct {
 
 /** 以太网 netif */
 static struct netif *s_eth_netif = NULL;
+static struct netif *s_ddc_netif = NULL;
 
 /** Top Node 配置 */
 static top_config_t s_top_config;
@@ -122,6 +124,10 @@ static void send_garp(const uint8_t *mac, const ip4_addr_t *ip);
 static bool pbuf_copy_exact(struct pbuf *p, uint16_t offset, void *dst,
                             uint16_t len);
 static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out);
+static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
+                                    bool is_broadcast, uint8_t *out_data,
+                                    uint16_t *out_len);
+static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p);
 static bridge_action_t check_arp_request(struct pbuf *p);
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
                                          const uint8_t *target_mac,
@@ -255,8 +261,7 @@ bridge_action_t tpmesh_bridge_check(struct pbuf *p) {
 }
 
 int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node || p == NULL ||
-      p->tot_len < SIZEOF_ETH_HDR) {
+  if (!s_initialized || p == NULL || p->tot_len < SIZEOF_ETH_HDR) {
     return -1;
   }
   if (!tpmesh_at_is_uart6_active()) {
@@ -275,33 +280,60 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
   bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
   uint8_t tunnel_buf[1600];
   uint16_t tunnel_len;
-  if (schc_compress((uint8_t *)frame->payload, frame->tot_len, tunnel_buf,
-                    &tunnel_len, is_broadcast) != 0) {
-    ret = -2;
-    goto out;
-  }
   uint16_t dest_mesh_id;
-  if (is_broadcast) {
-    if (!broadcast_rate_check()) {
-      tpmesh_debug_printf("TPMesh: Broadcast rate limited\n");
-      ret = -3;
+
+  if (s_is_top_node) {
+    if (schc_compress((uint8_t *)frame->payload, frame->tot_len, tunnel_buf,
+                      &tunnel_len, is_broadcast) != 0) {
+      ret = -2;
       goto out;
     }
-    dest_mesh_id = MESH_ADDR_BROADCAST;
+
+    if (is_broadcast) {
+      if (!broadcast_rate_check()) {
+        tpmesh_debug_printf("TPMesh: Broadcast rate limited\n");
+        ret = -3;
+        goto out;
+      }
+      dest_mesh_id = MESH_ADDR_BROADCAST;
+    } else {
+      dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
+      if (dest_mesh_id == MESH_ADDR_INVALID ||
+          !node_table_is_online(dest_mesh_id)) {
+        tpmesh_debug_printf("TPMesh: destination node unavailable\n");
+        ret = -4;
+        goto out;
+      }
+    }
   } else {
-    dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
-    if (dest_mesh_id == MESH_ADDR_INVALID || !node_table_is_online(dest_mesh_id)) {
-      tpmesh_debug_printf("TPMesh: destination node unavailable\n");
-      ret = -4;
+    if (build_no_compress_tunnel((const uint8_t *)frame->payload, frame->tot_len,
+                                 is_broadcast, tunnel_buf, &tunnel_len) != 0) {
+      ret = -2;
       goto out;
     }
+    dest_mesh_id = MESH_ADDR_TOP_NODE;
   }
+
   ret = fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
 out:
   if (contig != NULL) {
     pbuf_free(contig);
   }
   return ret;
+}
+
+int tpmesh_bridge_attach_ddc_netif(struct netif *netif) {
+  if (netif == NULL || netif->linkoutput == NULL) {
+    return -1;
+  }
+  if (netif->linkoutput == ddc_netif_linkoutput_hook && s_ddc_netif == netif) {
+    return 0;
+  }
+
+  s_ddc_netif = netif;
+  netif->linkoutput = ddc_netif_linkoutput_hook;
+  tpmesh_debug_printf("TPMesh DDC: netif linkoutput hooked to Mesh bridge\n");
+  return 0;
 }
 
 int tpmesh_bridge_send_proxy_arp(struct pbuf *p) {
@@ -938,8 +970,9 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
   uint16_t dst_mesh_id =
       s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
 
-  if (schc_decompress(complete_data, complete_len, eth_frame, &eth_len,
-                      src_mesh_id, dst_mesh_id) != 0) {
+  if (schc_decompress(complete_data, complete_len, eth_frame,
+                      (uint16_t)sizeof(eth_frame), &eth_len, src_mesh_id,
+                      dst_mesh_id) != 0) {
     tpmesh_debug_printf("TPMesh: Decompress failed\n");
     return;
   }
@@ -998,6 +1031,38 @@ static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out) {
   }
   *out = cpy;
   return true;
+}
+
+static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
+                                    bool is_broadcast, uint8_t *out_data,
+                                    uint16_t *out_len) {
+  if (eth_frame == NULL || out_data == NULL || out_len == NULL ||
+      eth_len < ETH_HDR_LEN) {
+    return -1;
+  }
+
+  out_data[0] = is_broadcast ? 0x80 : 0x00;
+  out_data[1] = 0x80;
+  out_data[2] = SCHC_RULE_NO_COMPRESS;
+
+  /* Keep full L2 identity: [SRC_MAC][DST_MAC][EtherType + Payload] */
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN, eth_frame + ETH_HWADDR_LEN,
+         ETH_HWADDR_LEN);
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN + ETH_HWADDR_LEN, eth_frame,
+         ETH_HWADDR_LEN);
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN + (ETH_HWADDR_LEN * 2),
+         eth_frame + (ETH_HWADDR_LEN * 2), eth_len - (ETH_HWADDR_LEN * 2));
+
+  *out_len = TPMESH_TUNNEL_HDR_LEN + eth_len;
+  return 0;
+}
+
+static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
+  if (netif == NULL || netif != s_ddc_netif || !s_initialized || s_is_top_node) {
+    return ERR_IF;
+  }
+
+  return (tpmesh_bridge_forward_to_mesh(p) == 0) ? ERR_OK : ERR_IF;
 }
 
 static bridge_action_t check_arp_request(struct pbuf *p) {

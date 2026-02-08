@@ -168,6 +168,16 @@ int tpmesh_module_init_ddc(void) {
     return ret;
   }
 
+  if (netif_default == NULL) {
+    tpmesh_debug_printf("TPMesh Init: DDC netif is NULL, hook failed\n");
+    return -3;
+  }
+  ret = tpmesh_bridge_attach_ddc_netif(netif_default);
+  if (ret != 0) {
+    tpmesh_debug_printf("TPMesh Init: DDC linkoutput hook failed (%d)\n", ret);
+    return ret;
+  }
+
   s_is_top_node = false;
   s_tpmesh_initialized = true;
   s_uart6_taken_over = false;
@@ -215,11 +225,22 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
   bridge_action_t action = tpmesh_bridge_check(p);
 
   switch (action) {
-  case BRIDGE_TO_MESH:
-    return (tpmesh_bridge_forward_to_mesh(p) == 0);
+  case BRIDGE_TO_MESH: {
+    int ret = tpmesh_bridge_forward_to_mesh(p);
+    if (ret != 0) {
+      tpmesh_debug_printf("TPMesh Hook: forward_to_mesh failed (%d), drop\n",
+                          ret);
+    }
+    return true;
+  }
 
-  case BRIDGE_PROXY_ARP:
-    return (tpmesh_bridge_send_proxy_arp(p) == 0);
+  case BRIDGE_PROXY_ARP: {
+    int ret = tpmesh_bridge_send_proxy_arp(p);
+    if (ret != 0) {
+      tpmesh_debug_printf("TPMesh Hook: proxy_arp failed (%d), drop\n", ret);
+    }
+    return true;
+  }
 
   case BRIDGE_DROP:
     return true;

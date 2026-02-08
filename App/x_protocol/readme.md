@@ -2105,3 +2105,48 @@ Key points:
 - Proxy ARP must only reply for nodes that are both `known` and `online`.
 - Unicast forwarding to mesh must only happen for nodes that are both `known` and `online`; offline targets are dropped to avoid stale-map blackholes.
 - Implementation note (v0.7.1): sink ingress safety policy into `tpmesh_bridge.c` (`tpmesh_bridge_check/forward/proxy_arp`) so `tpmesh_eth_input_hook()` only dispatches actions and no longer duplicates frame-parse logic.
+
+---
+
+## 13. Top/Edge Netif Architecture Alignment (2026-02-08)
+
+This section supersedes ambiguous earlier descriptions and is the source of truth for current behavior.
+
+### 13.1 Core Principles
+
+- No virtual NIC is introduced in either role.
+- `Top` keeps using physical Ethernet (`PHY`) as the external BMS-facing interface.
+- `Edge` (DDC) does not transmit through PHY; it reuses the existing LwIP `netif` object but hooks `netif->linkoutput` to TPMesh bridge.
+- Packet policy stays in bridge layer; init layer only performs mode wiring.
+
+### 13.2 Role-specific Data Path
+
+- Top (`TPMESH_MODE_TOP_NODE`)
+  - ETH RX: driver hook -> `tpmesh_eth_input_hook()` -> bridge policy -> local stack or Mesh.
+  - Mesh RX: `tpmesh_bridge_handle_mesh_data()` decapsulates to a normal Ethernet/UDP frame and forwards via physical `linkoutput` to BMS network.
+- Edge (`TPMESH_MODE_DDC`)
+  - Local stack TX: LwIP `netif->linkoutput` is hooked to bridge and sent to Mesh (not PHY).
+  - Mesh RX: bridge decapsulates and injects back into local stack through `netif->input`.
+
+### 13.3 SCHC Compatibility Decision
+
+- For Edge uplink (DDC -> Top), bridge forces `SCHC_RULE_NO_COMPRESS` for data frames.
+- Reason: this preserves destination MAC and EtherType end-to-end, so Top can emit a normal L2/L3 UDP packet on physical Ethernet without guessing BMS destination MAC.
+- Top downlink keeps existing SCHC behavior for ETH -> Mesh direction.
+
+### 13.4 Code Mapping
+
+- Mode wiring and hook dispatch: `App/x_protocol/tpmesh_init.c`.
+- Bridge policy and forwarding: `App/x_protocol/tpmesh_bridge.c`.
+- Main startup sequence remains in `App/main.c`; mode-specific behavior is determined by TPMesh init path and bridge hook.
+
+---
+
+## 14. SCHC and Hook Safety Fixes (2026-02-08)
+
+- `schc_decompress()` now takes output buffer capacity and performs strict bounds checks before every write.
+- `tpmesh_bridge.c` passes explicit capacity (`sizeof(eth_frame)`) to `schc_decompress()` and drops invalid/oversized frames.
+- `schc_parse_tunnel_header()` now takes input length and rejects short buffers.
+- `schc_get_rule()` no longer applies `SCHC_RULE_IP_ONLY` to non-UDP IPv4 packets. Non-UDP traffic falls back to `SCHC_RULE_NO_COMPRESS`.
+- IPv4 options compatibility: if IPv4 IHL is not 20 bytes, compression falls back to `SCHC_RULE_NO_COMPRESS` to avoid header misalignment.
+- `tpmesh_eth_input_hook()` is fail-closed for `BRIDGE_TO_MESH` and `BRIDGE_PROXY_ARP`: once bridge policy selects these actions, frame will not fall back into local LwIP stack even if forwarding fails.
