@@ -27,9 +27,17 @@ UART6 ownership state is now explicit:
 
 ## Runtime Handover
 1. External module requests takeover via `tpmesh_request_uart6_takeover()`.
-2. `x_protocol` releases UART6 (`tpmesh_at_release_uart6()`), and AT traffic becomes unavailable.
-3. External module performs configuration on UART6.
-4. External module restarts DDC service (or device), then `x_protocol` starts in selected mode.
+2. Caller must check return value:
+   - `0`: UART6 released, external module can start configuration.
+   - non-zero: release failed (for example TX busy), external module must not use UART6 yet.
+3. `x_protocol` releases UART6 (`tpmesh_at_release_uart6()`), and AT traffic becomes unavailable.
+4. External module performs configuration on UART6.
+5. External module restarts DDC service (or device), then `x_protocol` starts in selected mode.
+
+Important:
+
+- `tpmesh_request_uart6_takeover()` is no longer fire-and-forget. It is a deterministic ownership API and must be checked by integration code.
+- `tpmesh_reclaim_uart6_for_tpmesh()` performs quiet UART6 re-acquire (no startup probe bytes/banner on UART line).
 
 Optional reclaim API is provided for non-restart scenarios:
 - `tpmesh_reclaim_uart6_for_tpmesh()`

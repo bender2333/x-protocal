@@ -135,8 +135,9 @@ bool tpmesh_is_initialized(void);
 
 /**
  * @brief 请求 x_protocol 释放 UART6，供外部模块接管配置
+ * @return 0=成功, <0=失败
  */
-void tpmesh_request_uart6_takeover(void);
+int tpmesh_request_uart6_takeover(void);
 
 /**
  * @brief 非重启场景下，重新由 x_protocol 接管 UART6

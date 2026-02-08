@@ -47,11 +47,7 @@ static inline uint16_t rx_count(void)
     return (uint16_t)((s_rx_head - s_rx_tail) & RX_BUF_MASK);
 }
 
-/* ============================================================================
- * 公共函数
- * ============================================================================ */
-
-int tpmesh_uart6_init(void)
+static int tpmesh_uart6_init_internal(bool quiet)
 {
     if (s_initialized) {
         return 0;
@@ -128,23 +124,40 @@ int tpmesh_uart6_init(void)
         tpmesh_debug_printf("===========================\n\n");
     }
 
-    /* 发送测试: 先发 0x55('U') 10次方便示波器/逻辑分析仪验证波特率 */
-    for (int i = 0; i < 10; i++) {
-        uint32_t t = 0xFFFF;
-        while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TBE)) && (--t > 0));
-        usart_data_transmit(UART6_PERIPH, 0x55U);
-    }
-    /* 等待最后一字节发完 */
-    {
-        uint32_t t = 0xFFFF;
-        while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TC)) && (--t > 0));
-    }
+    if (!quiet) {
+        /* 发送测试: 先发 0x55('U') 10次方便示波器/逻辑分析仪验证波特率 */
+        for (int i = 0; i < 10; i++) {
+            uint32_t t = 0xFFFF;
+            while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TBE)) && (--t > 0));
+            usart_data_transmit(UART6_PERIPH, 0x55U);
+        }
+        /* 等待最后一字节发完 */
+        {
+            uint32_t t = 0xFFFF;
+            while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TC)) && (--t > 0));
+        }
 
-    /* 发送可读测试字符串 */
-    tpmesh_uart6_puts("\r\n[UART6] Ready\r\n");
-    tpmesh_debug_printf("UART6: Init OK (PF7/PF6, %d baud)\n", TPMESH_UART6_BAUD);
+        /* 发送可读测试字符串 */
+        tpmesh_uart6_puts("\r\n[UART6] Ready\r\n");
+    }
+    tpmesh_debug_printf("UART6: Init OK (PF7/PF6, %d baud)%s\n", TPMESH_UART6_BAUD,
+                        quiet ? " [quiet]" : "");
 
     return 0;
+}
+
+/* ============================================================================
+ * 公共函数
+ * ============================================================================ */
+
+int tpmesh_uart6_init(void)
+{
+    return tpmesh_uart6_init_internal(false);
+}
+
+int tpmesh_uart6_init_quiet(void)
+{
+    return tpmesh_uart6_init_internal(true);
 }
 
 void tpmesh_uart6_deinit(void)

@@ -2086,6 +2086,12 @@ Key points:
 - external module can request UART6 handover before configuring TPMesh.
 - after external configuration, restart service/device to relaunch x_protocol cleanly.
 
+2026-02-08 refinement:
+
+- `tpmesh_request_uart6_takeover()` returns explicit status so caller can deterministically know whether UART6 has been released.
+- Busy release is not silently ignored; caller must check return value before using UART6 externally.
+- `tpmesh_reclaim_uart6_for_tpmesh()` uses a quiet re-acquire path and does not emit probe bytes/banner on UART6, avoiding parser disturbance on running TPMesh module.
+
 ---
 
 ## 11. Build Linker Permission Note (2026-02-07)

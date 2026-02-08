@@ -146,6 +146,9 @@ int tpmesh_at_release_uart6(void);
 
 /**
  * @brief Re-acquire UART6 ownership for x_protocol.
+ *
+ * Re-acquire path is quiet (no probe bytes or startup banner sent to UART6).
+ *
  * @return 0=success
  */
 int tpmesh_at_acquire_uart6(void);

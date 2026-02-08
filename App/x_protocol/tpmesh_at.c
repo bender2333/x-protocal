@@ -200,7 +200,7 @@ int tpmesh_at_acquire_uart6(void) {
     return 0;
   }
 
-  if (tpmesh_uart6_init() != 0) {
+  if (tpmesh_uart6_init_quiet() != 0) {
     tpmesh_debug_printf("AT: UART6 re-acquire failed\n");
     return -2;
   }

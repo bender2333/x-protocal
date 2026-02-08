@@ -42,6 +42,9 @@ static TaskHandle_t s_at_rx_task_handle = NULL;
 static TaskHandle_t s_bridge_task_handle = NULL;
 static TaskHandle_t s_heartbeat_task_handle = NULL;
 
+#define TPMESH_UART6_TAKEOVER_RETRY_MAX 3
+#define TPMESH_UART6_TAKEOVER_RETRY_MS 50
+
 /* ============================================================================
  * 公共函数
  * ============================================================================
@@ -253,16 +256,34 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
 
 bool tpmesh_is_initialized(void) { return s_tpmesh_initialized; }
 
-void tpmesh_request_uart6_takeover(void) {
+int tpmesh_request_uart6_takeover(void) {
   if (!s_tpmesh_initialized) {
-    return;
+    return -1;
   }
-  int ret = tpmesh_at_release_uart6();
-  if (ret == 0) {
-    s_uart6_taken_over = true;
-  } else {
-    tpmesh_debug_printf("TPMesh: UART6 takeover request failed (%d)\n", ret);
+
+  if (s_uart6_taken_over) {
+    return 0;
   }
+
+  int ret = -1;
+  for (int i = 0; i < TPMESH_UART6_TAKEOVER_RETRY_MAX; i++) {
+    ret = tpmesh_at_release_uart6();
+    if (ret == 0) {
+      s_uart6_taken_over = true;
+      return 0;
+    }
+
+    /* Busy path: retry a few times to make ownership handover deterministic. */
+    if (ret == -3 && xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED &&
+        i + 1 < TPMESH_UART6_TAKEOVER_RETRY_MAX) {
+      vTaskDelay(pdMS_TO_TICKS(TPMESH_UART6_TAKEOVER_RETRY_MS));
+      continue;
+    }
+    break;
+  }
+
+  tpmesh_debug_printf("TPMesh: UART6 takeover request failed (%d)\n", ret);
+  return ret;
 }
 
 int tpmesh_reclaim_uart6_for_tpmesh(void) {
