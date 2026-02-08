@@ -52,15 +52,6 @@ extern "C" {
 int tpmesh_uart6_init(void);
 
 /**
- * @brief 初始化 UART6（静默模式，不发送探测字节/Ready banner）
- *
- * 用于运行中 re-acquire 场景，避免向已在运行的模组注入额外串口字节。
- *
- * @return 0=成功
- */
-int tpmesh_uart6_init_quiet(void);
-
-/**
  * @brief 反初始化 UART6
  */
 void tpmesh_uart6_deinit(void);

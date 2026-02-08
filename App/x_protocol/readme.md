@@ -2088,9 +2088,10 @@ Key points:
 
 2026-02-08 refinement:
 
-- `tpmesh_request_uart6_takeover()` returns explicit status so caller can deterministically know whether UART6 has been released.
-- Busy release is not silently ignored; caller must check return value before using UART6 externally.
-- `tpmesh_reclaim_uart6_for_tpmesh()` uses a quiet re-acquire path and does not emit probe bytes/banner on UART6, avoiding parser disturbance on running TPMesh module.
+- Adopt one-way UART6 handover model for config tool integration:
+  - `tpmesh_request_uart6_takeover()` blocks until UART6 is released safely.
+  - External module takes UART6, completes configuration, then restarts current runtime.
+- In-process UART6 reclaim and takeover-state persistence are not required in this model.
 
 ---
 

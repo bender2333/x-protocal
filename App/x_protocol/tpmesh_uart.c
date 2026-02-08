@@ -47,7 +47,7 @@ static inline uint16_t rx_count(void)
     return (uint16_t)((s_rx_head - s_rx_tail) & RX_BUF_MASK);
 }
 
-static int tpmesh_uart6_init_internal(bool quiet)
+static int tpmesh_uart6_init_internal(void)
 {
     if (s_initialized) {
         return 0;
@@ -124,24 +124,21 @@ static int tpmesh_uart6_init_internal(bool quiet)
         tpmesh_debug_printf("===========================\n\n");
     }
 
-    if (!quiet) {
-        /* 发送测试: 先发 0x55('U') 10次方便示波器/逻辑分析仪验证波特率 */
-        for (int i = 0; i < 10; i++) {
-            uint32_t t = 0xFFFF;
-            while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TBE)) && (--t > 0));
-            usart_data_transmit(UART6_PERIPH, 0x55U);
-        }
-        /* 等待最后一字节发完 */
-        {
-            uint32_t t = 0xFFFF;
-            while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TC)) && (--t > 0));
-        }
-
-        /* 发送可读测试字符串 */
-        tpmesh_uart6_puts("\r\n[UART6] Ready\r\n");
+    /* 发送测试: 先发 0x55('U') 10次方便示波器/逻辑分析仪验证波特率 */
+    for (int i = 0; i < 10; i++) {
+        uint32_t t = 0xFFFF;
+        while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TBE)) && (--t > 0));
+        usart_data_transmit(UART6_PERIPH, 0x55U);
     }
-    tpmesh_debug_printf("UART6: Init OK (PF7/PF6, %d baud)%s\n", TPMESH_UART6_BAUD,
-                        quiet ? " [quiet]" : "");
+    /* 等待最后一字节发完 */
+    {
+        uint32_t t = 0xFFFF;
+        while ((RESET == usart_flag_get(UART6_PERIPH, USART_FLAG_TC)) && (--t > 0));
+    }
+
+    /* 发送可读测试字符串 */
+    tpmesh_uart6_puts("\r\n[UART6] Ready\r\n");
+    tpmesh_debug_printf("UART6: Init OK (PF7/PF6, %d baud)\n", TPMESH_UART6_BAUD);
 
     return 0;
 }
@@ -152,12 +149,7 @@ static int tpmesh_uart6_init_internal(bool quiet)
 
 int tpmesh_uart6_init(void)
 {
-    return tpmesh_uart6_init_internal(false);
-}
-
-int tpmesh_uart6_init_quiet(void)
-{
-    return tpmesh_uart6_init_internal(true);
+    return tpmesh_uart6_init_internal();
 }
 
 void tpmesh_uart6_deinit(void)

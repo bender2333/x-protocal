@@ -136,20 +136,13 @@ bool tpmesh_is_initialized(void);
 /**
  * @brief 请求 x_protocol 释放 UART6，供外部模块接管配置
  * @return 0=成功, <0=失败
+ *
+ * 行为说明:
+ * - 该接口在 busy 场景下可阻塞等待，直到 UART6 可安全释放。
+ * - 当前集成模型为“释放 -> 外部配置 -> 进程/模块重启”，
+ *   不提供运行中 reclaim 接口。
  */
 int tpmesh_request_uart6_takeover(void);
-
-/**
- * @brief 非重启场景下，重新由 x_protocol 接管 UART6
- * @return 0=成功
- */
-int tpmesh_reclaim_uart6_for_tpmesh(void);
-
-/**
- * @brief 查询 UART6 是否处于外部接管状态
- * @return true=已外部接管
- */
-bool tpmesh_is_uart6_taken_over(void);
 
 /**
  * @brief 打印 TPMesh 状态 (调试用)

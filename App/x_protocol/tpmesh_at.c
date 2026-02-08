@@ -92,10 +92,7 @@ static void bytes_to_hex(const uint8_t *data, uint16_t len, char *hex);
 
 int tpmesh_at_init(void) {
   if (s_initialized) {
-    if (!s_uart6_active) {
-      return tpmesh_at_acquire_uart6();
-    }
-    return 0;
+    return s_uart6_active ? 0 : -3;
   }
 
   /* 1. UART6 初始化 (GPIO + 外设 + 中断, 无 RTOS 依赖) */
@@ -189,27 +186,6 @@ int tpmesh_at_release_uart6(void) {
   }
 
   tpmesh_debug_printf("AT: UART6 released for external owner\n");
-  return 0;
-}
-
-int tpmesh_at_acquire_uart6(void) {
-  if (!s_initialized) {
-    return -1;
-  }
-  if (s_uart6_active) {
-    return 0;
-  }
-
-  if (tpmesh_uart6_init_quiet() != 0) {
-    tpmesh_debug_printf("AT: UART6 re-acquire failed\n");
-    return -2;
-  }
-
-  tpmesh_uart6_rx_flush();
-  s_line_idx = 0;
-  s_line_buf[0] = '\0';
-  s_uart6_active = true;
-  tpmesh_debug_printf("AT: UART6 re-acquired by x_protocol\n");
   return 0;
 }
 

@@ -129,7 +129,7 @@ typedef void (*tpmesh_route_cb_t)(const char *event, uint16_t addr);
  *
  * @note 可在调度器启动前调用, 不发送任何 AT 命令
  *
- * @return 0=成功, -1=UART失败, -2=RTOS对象创建失败
+ * @return 0=成功, -1=UART失败, -2=RTOS对象创建失败, -3=已初始化但UART已被释放
  */
 int tpmesh_at_init(void);
 
@@ -143,15 +143,6 @@ void tpmesh_at_deinit(void);
  * @return 0=success
  */
 int tpmesh_at_release_uart6(void);
-
-/**
- * @brief Re-acquire UART6 ownership for x_protocol.
- *
- * Re-acquire path is quiet (no probe bytes or startup banner sent to UART6).
- *
- * @return 0=success
- */
-int tpmesh_at_acquire_uart6(void);
 
 /**
  * @brief Query whether UART6 is currently owned by x_protocol AT layer.

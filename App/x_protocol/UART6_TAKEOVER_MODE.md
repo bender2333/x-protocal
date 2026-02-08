@@ -9,6 +9,7 @@ After that configuration flow completes, the system restarts the full DDC proces
 - Ensure `x_protocol` stops using `UART6` before takeover.
 - Support startup mode where `x_protocol` skips its own module configuration sequence (`AT`, `AT+ADDR`, `AT+CELL`, `AT+LP`).
 - Keep runtime behavior deterministic during takeover window.
+- Use one-way handover model: release, then restart module/process; no in-process reclaim.
 
 ## Architecture Update
 Two configuration ownership modes are introduced:
@@ -27,20 +28,16 @@ UART6 ownership state is now explicit:
 
 ## Runtime Handover
 1. External module requests takeover via `tpmesh_request_uart6_takeover()`.
-2. Caller must check return value:
-   - `0`: UART6 released, external module can start configuration.
-   - non-zero: release failed (for example TX busy), external module must not use UART6 yet.
-3. `x_protocol` releases UART6 (`tpmesh_at_release_uart6()`), and AT traffic becomes unavailable.
-4. External module performs configuration on UART6.
-5. External module restarts DDC service (or device), then `x_protocol` starts in selected mode.
+2. `x_protocol` blocks until UART6 can be safely released (for example wait for TX busy to clear), then returns success.
+3. External module takes UART6 and performs configuration.
+4. External module terminates/restarts current x_protocol runtime.
+5. x_protocol starts again from normal init path.
 
 Important:
 
-- `tpmesh_request_uart6_takeover()` is no longer fire-and-forget. It is a deterministic ownership API and must be checked by integration code.
-- `tpmesh_reclaim_uart6_for_tpmesh()` performs quiet UART6 re-acquire (no startup probe bytes/banner on UART line).
-
-Optional reclaim API is provided for non-restart scenarios:
-- `tpmesh_reclaim_uart6_for_tpmesh()`
+- No in-process UART6 reclaim API is provided in this model.
+- No persistent "taken over" state is maintained across runtime.
+- Ownership transfer point is `tpmesh_request_uart6_takeover()` + runtime restart boundary.
 
 ## Integration Notes
 - During takeover, DDC heartbeat/register loop pauses AT actions.

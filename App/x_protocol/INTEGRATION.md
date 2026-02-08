@@ -316,16 +316,11 @@ node_table_dump();
 When an external module needs UART6 to configure TPMesh:
 
 1. Call `tpmesh_request_uart6_takeover()` before external configuration.
-2. Check return value:
-   - `0`: ownership transferred; external module can use UART6.
-   - non-zero: ownership not transferred; do not access UART6 yet.
+2. Function blocks until ownership is safely transferred (or returns error).
 3. External module performs UART6 configuration sequence.
-4. Restart DDC service/device to relaunch x_protocol.
+4. Terminate/restart current runtime, then relaunch x_protocol.
 
-Optional (non-restart reclaim):
-
-- Call `tpmesh_reclaim_uart6_for_tpmesh()`.
-  - Reclaim path is quiet and does not emit startup probe bytes/banner on UART6.
+This model does not use in-process UART6 reclaim/state APIs.
 
 Compile-time policy:
 
