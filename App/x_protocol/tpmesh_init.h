@@ -134,6 +134,17 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p);
 bool tpmesh_is_initialized(void);
 
 /**
+ * @brief 请求 x_protocol 释放 UART6，供外部模块接管配置
+ * @return 0=成功, <0=失败
+ *
+ * 行为说明:
+ * - 该接口在 busy 场景下可阻塞等待，直到 UART6 可安全释放。
+ * - 当前集成模型为“释放 -> 外部配置 -> 进程/模块重启”，
+ *   不提供运行中 reclaim 接口。
+ */
+int tpmesh_request_uart6_takeover(void);
+
+/**
  * @brief 打印 TPMesh 状态 (调试用)
  */
 void tpmesh_print_status(void);

@@ -17,6 +17,7 @@
 /* node_table.h 已通过 tpmesh_bridge.h 包含 */
 #include "FreeRTOS.h"
 #include "lwip/etharp.h"
+#include "lwip/err.h"
 #include "lwip/ip.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
@@ -60,6 +61,7 @@ typedef struct {
 
 /** 以太网 netif */
 static struct netif *s_eth_netif = NULL;
+static struct netif *s_ddc_netif = NULL;
 
 /** Top Node 配置 */
 static top_config_t s_top_config;
@@ -81,6 +83,18 @@ static volatile uint32_t s_last_register_tick = 0;
 
 /** 心跳最后时间 */
 static volatile uint32_t s_last_heartbeat_tick = 0;
+
+/** 心跳 ACK 最后时间 */
+static volatile uint32_t s_last_heartbeat_ack_tick = 0;
+
+/** 心跳发送时间 (等待 ACK 用) */
+static volatile uint32_t s_last_heartbeat_send_tick = 0;
+
+/** 心跳 ACK 连续丢失计数 */
+static volatile uint8_t s_heartbeat_miss_count = 0;
+
+/** 当前是否等待心跳 ACK */
+static volatile bool s_waiting_heartbeat_ack = false;
 
 /** 广播限速器 */
 static rate_limiter_t s_rate_limiter = {0, 0};
@@ -119,8 +133,14 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
 static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
                                uint16_t len);
 static void send_garp(const uint8_t *mac, const ip4_addr_t *ip);
-static bridge_action_t check_arp_request(struct pbuf *p,
-                                         const uint8_t **target_ip);
+static bool pbuf_copy_exact(struct pbuf *p, uint16_t offset, void *dst,
+                            uint16_t len);
+static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out);
+static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
+                                    bool is_broadcast, uint8_t *out_data,
+                                    uint16_t *out_len);
+static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p);
+static bridge_action_t check_arp_request(struct pbuf *p);
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
                                          const uint8_t *target_mac,
                                          const ip4_addr_t *target_ip);
@@ -141,6 +161,12 @@ int tpmesh_top_init(struct netif *eth_netif, const top_config_t *config) {
 
   /* ---- 仅硬件/内存初始化 (调度器前安全) ---- */
   node_table_init();
+  if (node_table_add_static(config->mac_addr, &config->ip_addr,
+                            config->mesh_id) != 0) {
+    tpmesh_debug_printf("TPMesh Top: add self static node failed\n");
+  } else {
+    node_table_touch(config->mesh_id);
+  }
 
   if (tpmesh_at_init() != 0) {
     tpmesh_debug_printf("TPMesh: AT init failed\n");
@@ -178,6 +204,12 @@ int tpmesh_ddc_init(const ddc_config_t *config) {
 
   /* ---- 仅硬件/内存初始化 (调度器前安全) ---- */
   node_table_init();
+  if (node_table_add_static(config->mac_addr, &config->ip_addr,
+                            config->mesh_id) != 0) {
+    tpmesh_debug_printf("TPMesh DDC: add self static node failed\n");
+  } else {
+    node_table_touch(config->mesh_id);
+  }
 
   if (tpmesh_at_init() != 0) {
     tpmesh_debug_printf("TPMesh: AT init failed\n");
@@ -192,6 +224,11 @@ int tpmesh_ddc_init(const ddc_config_t *config) {
   }
 
   memset(&s_ddc_reassembly, 0, sizeof(s_ddc_reassembly));
+  s_last_heartbeat_tick = 0;
+  s_last_heartbeat_ack_tick = 0;
+  s_last_heartbeat_send_tick = 0;
+  s_heartbeat_miss_count = 0;
+  s_waiting_heartbeat_ack = false;
 
   s_initialized = true;
   tpmesh_debug_printf("DDC: HW init done (Mesh ID: 0x%04X)\n", config->mesh_id);
@@ -206,116 +243,166 @@ int tpmesh_ddc_init(const ddc_config_t *config) {
  */
 
 bridge_action_t tpmesh_bridge_check(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node || p->len < ETH_HDR_LEN) {
+  if (!s_initialized || !s_is_top_node || p == NULL ||
+      p->tot_len < SIZEOF_ETH_HDR) {
     return BRIDGE_LOCAL;
   }
-
-  struct eth_hdr *eth = (struct eth_hdr *)p->payload;
-  uint16_t ethertype = lwip_ntohs(eth->type);
-
-  /* 检查目标 MAC */
-  bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
-
+  struct eth_hdr eth_hdr;
+  if (!pbuf_copy_exact(p, 0, &eth_hdr, SIZEOF_ETH_HDR)) {
+    return BRIDGE_LOCAL;
+  }
+  uint16_t ethertype = lwip_ntohs(eth_hdr.type);
+  bool is_broadcast = schc_is_broadcast_mac((const uint8_t *)&eth_hdr.dest);
   if (is_broadcast) {
-    /* 广播帧处理 */
     if (ethertype == ETHTYPE_ARP) {
-      /* ARP 广播 - 检查是否需要代理应答 */
-      const uint8_t *target_ip;
-      bridge_action_t action = check_arp_request(p, &target_ip);
-      return action;
+      return check_arp_request(p);
     }
-
     if (ethertype == ETHTYPE_IP) {
-      /* IP 广播 - 检查 UDP 端口 */
-      if (p->len >= ETH_HDR_LEN + IP_HDR_LEN + UDP_HDR_LEN) {
-        struct ip_hdr *iph =
-            (struct ip_hdr *)((uint8_t *)p->payload + ETH_HDR_LEN);
-        if (IPH_PROTO(iph) == IP_PROTO_UDP) {
-          struct udp_hdr *udph =
-              (struct udp_hdr *)((uint8_t *)iph + IPH_HL_BYTES(iph));
-          uint16_t dst_port = lwip_ntohs(udph->dest);
-
-          if (dst_port == TPMESH_PORT_BACNET) {
-            /* BACnet 广播 (Who-Is) - 转发到 Mesh */
+      if (p->tot_len >= (SIZEOF_ETH_HDR + IP_HLEN + UDP_HLEN)) {
+        uint8_t l3_hdr_buf[SIZEOF_ETH_HDR + IP_HLEN_MAX + UDP_HLEN];
+        uint16_t copy_len = (uint16_t)sizeof(l3_hdr_buf);
+        if (p->tot_len < copy_len) {
+          copy_len = p->tot_len;
+        }
+        if (!pbuf_copy_exact(p, 0, l3_hdr_buf, copy_len)) {
+          return BRIDGE_DROP;
+        }
+        struct ip_hdr *iph = (struct ip_hdr *)(l3_hdr_buf + SIZEOF_ETH_HDR);
+        uint16_t ihl = IPH_HL_BYTES(iph);
+        if (ihl >= IP_HLEN && ihl <= IP_HLEN_MAX &&
+            (SIZEOF_ETH_HDR + ihl + UDP_HLEN) <= copy_len &&
+            IPH_PROTO(iph) == IP_PROTO_UDP) {
+          struct udp_hdr *udph = (struct udp_hdr *)((uint8_t *)iph + ihl);
+          if (lwip_ntohs(udph->dest) == TPMESH_PORT_BACNET) {
             return BRIDGE_TO_MESH;
           }
         }
       }
     }
-
-    /* 其他广播 - 丢弃 (DHCP, NetBIOS 等) */
     return BRIDGE_DROP;
   }
-
-  /* 单播帧 */
-  uint8_t *dst_mac = (uint8_t *)&eth->dest;
-
-  /* 检查是否发给 DDC */
-  if (node_table_is_ddc_mac(dst_mac)) {
-    return BRIDGE_TO_MESH;
+  uint16_t dst_mesh_id =
+      node_table_get_mesh_by_mac((const uint8_t *)&eth_hdr.dest);
+  if (dst_mesh_id == MESH_ADDR_INVALID) {
+    return BRIDGE_LOCAL;
   }
-
-  /* 发给本机 */
-  return BRIDGE_LOCAL;
+  return node_table_is_online(dst_mesh_id) ? BRIDGE_TO_MESH : BRIDGE_DROP;
 }
 
 int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node) {
+  if (!s_initialized || p == NULL || p->tot_len < SIZEOF_ETH_HDR) {
     return -1;
   }
-
-  struct eth_hdr *eth = (struct eth_hdr *)p->payload;
+  if (!tpmesh_at_is_uart6_active()) {
+    return -5;
+  }
+  int ret = 0;
+  struct pbuf *contig = NULL;
+  struct pbuf *frame = p;
+  if (p->len < p->tot_len) {
+    if (!clone_pbuf_contiguous(p, &contig)) {
+      return -6;
+    }
+    frame = contig;
+  }
+  struct eth_hdr *eth = (struct eth_hdr *)frame->payload;
   bool is_broadcast = schc_is_broadcast_mac((uint8_t *)&eth->dest);
-
-  /* SCHC 压缩 */
   uint8_t tunnel_buf[1600];
   uint16_t tunnel_len;
-
-  if (schc_compress((uint8_t *)p->payload, p->tot_len, tunnel_buf, &tunnel_len,
-                    is_broadcast) != 0) {
-    return -2;
-  }
-
-  /* 确定目标 Mesh ID */
   uint16_t dest_mesh_id;
-  if (is_broadcast) {
-    /* 广播限速检查 */
-    if (!broadcast_rate_check()) {
-      tpmesh_debug_printf("TPMesh: Broadcast rate limited\n");
-      return -3;
+
+  if (s_is_top_node) {
+    if (schc_compress((uint8_t *)frame->payload, frame->tot_len, tunnel_buf,
+                      &tunnel_len, is_broadcast) != 0) {
+      ret = -2;
+      goto out;
     }
-    dest_mesh_id = MESH_ADDR_BROADCAST;
+
+    if (is_broadcast) {
+      if (!broadcast_rate_check()) {
+        tpmesh_debug_printf("TPMesh: Broadcast rate limited\n");
+        ret = -3;
+        goto out;
+      }
+      dest_mesh_id = MESH_ADDR_BROADCAST;
+    } else {
+      dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
+      if (dest_mesh_id == MESH_ADDR_INVALID ||
+          !node_table_is_online(dest_mesh_id)) {
+        tpmesh_debug_printf("TPMesh: destination node unavailable\n");
+        ret = -4;
+        goto out;
+      }
+    }
   } else {
-    dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
-    if (dest_mesh_id == MESH_ADDR_INVALID) {
-      tpmesh_debug_printf("TPMesh: Unknown destination MAC\n");
-      return -4;
+    if (build_no_compress_tunnel((const uint8_t *)frame->payload, frame->tot_len,
+                                 is_broadcast, tunnel_buf, &tunnel_len) != 0) {
+      ret = -2;
+      goto out;
     }
+    dest_mesh_id = MESH_ADDR_TOP_NODE;
   }
 
-  /* 分片发送 */
-  return fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
+  ret = fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
+out:
+  if (contig != NULL) {
+    pbuf_free(contig);
+  }
+  return ret;
+}
+
+int tpmesh_bridge_attach_ddc_netif(struct netif *netif) {
+  if (netif == NULL || netif->linkoutput == NULL) {
+    return -1;
+  }
+  if (netif->linkoutput == ddc_netif_linkoutput_hook && s_ddc_netif == netif) {
+    return 0;
+  }
+
+  s_ddc_netif = netif;
+  netif->linkoutput = ddc_netif_linkoutput_hook;
+  tpmesh_debug_printf("TPMesh DDC: netif linkoutput hooked to Mesh bridge\n");
+  return 0;
 }
 
 int tpmesh_bridge_send_proxy_arp(struct pbuf *p) {
-  if (!s_initialized || !s_is_top_node) {
+  if (!s_initialized || !s_is_top_node || p == NULL ||
+      p->tot_len < (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
     return -1;
   }
-
-  /* 解析 ARP 请求 */
+  struct pbuf *contig = NULL;
+  struct pbuf *frame = p;
+  if (p->len < p->tot_len) {
+    if (!clone_pbuf_contiguous(p, &contig)) {
+      return -3;
+    }
+    frame = contig;
+  }
+  int ret = 0;
   struct etharp_hdr *arp =
-      (struct etharp_hdr *)((uint8_t *)p->payload + SIZEOF_ETH_HDR);
-
+      (struct etharp_hdr *)((uint8_t *)frame->payload + SIZEOF_ETH_HDR);
+  if (arp->opcode != PP_HTONS(ARP_REQUEST)) {
+    ret = -2;
+    goto out;
+  }
   ip4_addr_t target_ip;
   SMEMCPY(&target_ip, &arp->dipaddr, sizeof(ip4_addr_t));
-
-  /* 获取目标 DDC 的 MAC */
+  uint16_t mesh_id = node_table_get_mesh_by_ip(&target_ip);
+  if (mesh_id == MESH_ADDR_INVALID || !node_table_is_online(mesh_id)) {
+    ret = -2;
+    goto out;
+  }
   uint8_t target_mac[6];
   if (node_table_get_mac_by_ip(&target_ip, target_mac) != 0) {
-    return -2;
+    ret = -2;
+    goto out;
   }
-
-  return send_proxy_arp_reply_internal(p, target_mac, &target_ip);
+  ret = send_proxy_arp_reply_internal(frame, target_mac, &target_ip);
+out:
+  if (contig != NULL) {
+    pbuf_free(contig);
+  }
+  return ret;
 }
 
 void tpmesh_bridge_handle_mesh_data(uint16_t src_mesh_id, const uint8_t *data,
@@ -353,7 +440,8 @@ void tpmesh_bridge_task(void *arg) {
   tpmesh_at_set_data_cb(mesh_data_callback);
   tpmesh_at_set_route_cb(route_event_callback);
 
-  /* 模组 AT 命令初始化 (支持重试) */
+/* 模组初始化策略 */
+#if (TPMESH_MODULE_INIT_POLICY == TPMESH_MODULE_INIT_BY_X_PROTOCOL)
   {
     uint16_t mesh_id =
         s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
@@ -373,6 +461,10 @@ void tpmesh_bridge_task(void *arg) {
       vTaskDelay(pdMS_TO_TICKS(3000));
     }
   }
+#else
+  tpmesh_debug_printf(
+      "Bridge: external config mode, skip module AT init sequence\n");
+#endif
 
   tpmesh_debug_printf(
       "Bridge Task: business init complete, entering main loop\n");
@@ -400,6 +492,10 @@ void tpmesh_bridge_task(void *arg) {
  */
 
 int ddc_send_register(const ddc_config_t *config) {
+  if (!tpmesh_at_is_uart6_active()) {
+    return -1;
+  }
+
   reg_frame_t frame;
   frame.frame_type = REG_FRAME_REGISTER;
   memcpy(frame.mac, config->mac_addr, 6);
@@ -419,6 +515,10 @@ int ddc_send_register(const ddc_config_t *config) {
 }
 
 int ddc_send_heartbeat(const ddc_config_t *config) {
+  if (!tpmesh_at_is_uart6_active()) {
+    return -1;
+  }
+
   reg_frame_t frame;
   frame.frame_type = REG_FRAME_HEARTBEAT;
   memcpy(frame.mac, config->mac_addr, 6);
@@ -439,6 +539,11 @@ void ddc_heartbeat_task(void *arg) {
   (void)arg;
 
   while (1) {
+    if (!tpmesh_at_is_uart6_active()) {
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
     uint32_t now = tpmesh_get_tick_ms();
 
     switch (s_ddc_state) {
@@ -452,7 +557,9 @@ void ddc_heartbeat_task(void *arg) {
       if (s_last_register_tick == 0 ||
           (now - s_last_register_tick > TPMESH_REGISTER_RETRY_MS)) {
         if (s_register_retry_count < TPMESH_REGISTER_MAX_RETRIES) {
-          ddc_send_register(&s_ddc_config);
+          if (ddc_send_register(&s_ddc_config) != 0) {
+            tpmesh_debug_printf("TPMesh DDC: register send failed\n");
+          }
           s_last_register_tick = now;
           s_register_retry_count++;
         } else {
@@ -460,15 +567,42 @@ void ddc_heartbeat_task(void *arg) {
           tpmesh_module_reset();
           s_ddc_state = DDC_STATE_INIT;
           s_register_retry_count = 0;
+          s_waiting_heartbeat_ack = false;
+          s_heartbeat_miss_count = 0;
+          s_last_heartbeat_send_tick = 0;
+          s_last_heartbeat_ack_tick = 0;
         }
       }
       break;
 
     case DDC_STATE_ONLINE:
+      if (s_waiting_heartbeat_ack &&
+          s_last_heartbeat_send_tick > 0 &&
+          (now - s_last_heartbeat_send_tick > TPMESH_HEARTBEAT_ACK_TIMEOUT_MS)) {
+        s_waiting_heartbeat_ack = false;
+        s_heartbeat_miss_count++;
+        tpmesh_debug_printf(
+            "TPMesh DDC: heartbeat ACK timeout (%u/%u)\n",
+            (unsigned)s_heartbeat_miss_count, (unsigned)TPMESH_HEARTBEAT_MISS_MAX);
+        if (s_heartbeat_miss_count >= TPMESH_HEARTBEAT_MISS_MAX) {
+          tpmesh_debug_printf(
+              "TPMesh DDC: heartbeat lost, back to REGISTERING\n");
+          s_ddc_state = DDC_STATE_REGISTERING;
+          s_register_retry_count = 0;
+          s_last_register_tick = 0;
+          break;
+        }
+      }
+
       /* 心跳 */
       if (now - s_last_heartbeat_tick > TPMESH_HEARTBEAT_MS) {
-        ddc_send_heartbeat(&s_ddc_config);
-        s_last_heartbeat_tick = now;
+        if (ddc_send_heartbeat(&s_ddc_config) == 0) {
+          s_last_heartbeat_tick = now;
+          s_last_heartbeat_send_tick = now;
+          s_waiting_heartbeat_ack = true;
+        } else {
+          tpmesh_debug_printf("TPMesh DDC: heartbeat send failed\n");
+        }
       }
       break;
     }
@@ -547,7 +681,13 @@ void tpmesh_get_local_mac(uint8_t *mac) {
 
 static void mesh_data_callback(uint16_t src_mesh_id, const uint8_t *data,
                                uint16_t len) {
-  if (!s_initialized) {
+  if (!s_initialized || data == NULL || len == 0) {
+    return;
+  }
+  if (len > TPMESH_MTU) {
+    tpmesh_debug_printf(
+        "TPMesh: Drop oversize mesh frame src=0x%04X len=%u (MTU=%u)\n",
+        src_mesh_id, len, (unsigned)TPMESH_MTU);
     return;
   }
 
@@ -555,7 +695,7 @@ static void mesh_data_callback(uint16_t src_mesh_id, const uint8_t *data,
   if (s_mesh_msg_queue) {
     mesh_msg_t msg;
     msg.src_mesh_id = src_mesh_id;
-    msg.len = (len > TPMESH_MTU) ? TPMESH_MTU : len;
+    msg.len = len;
     memcpy(msg.data, data, msg.len);
     if (xQueueSend(s_mesh_msg_queue, &msg, 0) != pdTRUE) {
       tpmesh_debug_printf(
@@ -581,6 +721,17 @@ static void route_event_callback(const char *event, uint16_t addr) {
     s_ddc_state = DDC_STATE_REGISTERING;
     s_register_retry_count = 0;
     s_last_register_tick = 0;
+    s_waiting_heartbeat_ack = false;
+    s_heartbeat_miss_count = 0;
+    s_last_heartbeat_send_tick = 0;
+    s_last_heartbeat_ack_tick = 0;
+  } else if (!s_is_top_node && strncmp(ev, "DELETE", 6) == 0 &&
+             addr == MESH_ADDR_TOP_NODE) {
+    /* Top 路由失效,回到等待态 */
+    tpmesh_debug_printf("TPMesh DDC: Top Node route lost, back to INIT\n");
+    s_ddc_state = DDC_STATE_INIT;
+    s_waiting_heartbeat_ack = false;
+    s_heartbeat_miss_count = 0;
   }
 }
 
@@ -591,50 +742,47 @@ static void route_event_callback(const char *event, uint16_t addr) {
 
 static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
                              uint16_t len) {
-  if (len <= TPMESH_MTU) {
-    /* 无需分片 */
-    return tpmesh_at_send(dest_mesh_id, data, len);
+  if (!tpmesh_at_is_uart6_active()) {
+    return -2;
+  }
+  if (data == NULL || len < TPMESH_TUNNEL_HDR_LEN) {
+    return -1;
   }
 
-  /* 分片发送 */
+  /* 统一分片格式:
+   * 所有分片均保留 [L2_HDR][FRAG_HDR][RULE_ID]，仅切分 payload。 */
   uint8_t seq = 0;
   uint16_t offset = 0;
 
   while (offset < len) {
     uint8_t packet[TPMESH_MTU];
-    uint16_t chunk_len;
+    uint16_t chunk_len = 0;
 
     if (seq == 0) {
-      /* 第一片: 包含完整隧道头 */
+      /* 第一片: 拷贝完整前段数据 */
       chunk_len = (len > TPMESH_MTU) ? TPMESH_MTU : len;
       memcpy(packet, data, chunk_len);
-      /* 更新分片头: 非最后一片 */
-      if (len > TPMESH_MTU) {
-        packet[1] = seq & 0x7F; /* Last=0, Seq=0 */
-      }
+      offset += chunk_len;
     } else {
-      /* 后续片: 简化头 (仅 FRAG_HDR) */
+      /* 后续片: 保留隧道头，仅追加 payload */
+      memcpy(packet, data, TPMESH_TUNNEL_HDR_LEN);
       uint16_t remain = len - offset;
-      chunk_len = (remain > TPMESH_MTU - 1) ? (TPMESH_MTU - 1) : remain;
-
-      if (remain <= TPMESH_MTU - 1) {
-        packet[0] = 0x80 | (seq & 0x7F); /* Last=1 */
-      } else {
-        packet[0] = seq & 0x7F; /* Last=0 */
-      }
-      memcpy(packet + 1, data + offset, chunk_len);
-      chunk_len += 1;
+      uint16_t max_payload = TPMESH_MTU - TPMESH_TUNNEL_HDR_LEN;
+      uint16_t payload_len = (remain > max_payload) ? max_payload : remain;
+      memcpy(packet + TPMESH_TUNNEL_HDR_LEN, data + offset, payload_len);
+      chunk_len = TPMESH_TUNNEL_HDR_LEN + payload_len;
+      offset += payload_len;
     }
+
+    if (seq > 0x7F) {
+      return -1;
+    }
+    packet[1] = ((offset >= len) ? 0x80 : 0x00) | (seq & 0x7F);
 
     if (tpmesh_at_send(dest_mesh_id, packet, chunk_len) != 0) {
       return -1;
     }
 
-    if (seq == 0) {
-      offset = TPMESH_MTU;
-    } else {
-      offset += TPMESH_MTU - 1;
-    }
     seq++;
   }
 
@@ -687,6 +835,9 @@ static int reassemble_packet(uint16_t src_mesh_id, const uint8_t *data,
   if (!session) {
     return -1;
   }
+  if (data == NULL || len < TPMESH_TUNNEL_HDR_LEN) {
+    return -5;
+  }
 
   /* 解析分片头 */
   uint8_t frag_hdr = data[1];
@@ -700,6 +851,19 @@ static int reassemble_packet(uint16_t src_mesh_id, const uint8_t *data,
     session->total_len = 0;
     session->expected_seq = 0;
     session->last_tick = tpmesh_get_tick_ms();
+  } else {
+    if (!session->active) {
+      return -2;
+    }
+    if (tpmesh_get_tick_ms() - session->last_tick > 5000) {
+      session->active = false;
+      return -3;
+    }
+    if (session->total_len < TPMESH_TUNNEL_HDR_LEN ||
+        data[0] != session->buffer[0] || data[2] != session->buffer[2]) {
+      session->active = false;
+      return -6;
+    }
   }
 
   /* 序号检查 */
@@ -710,15 +874,9 @@ static int reassemble_packet(uint16_t src_mesh_id, const uint8_t *data,
     return -2;
   }
 
-  /* 超时检查 */
-  if (tpmesh_get_tick_ms() - session->last_tick > 5000) {
-    session->active = false;
-    return -3;
-  }
-
   /* 复制数据 */
   if (seq == 0) {
-    /* 第一片: 完整数据 */
+    /* 第一片: 拷贝完整隧道头 + 首段 payload */
     if (session->total_len + len > sizeof(session->buffer)) {
       session->active = false;
       return -4;
@@ -726,13 +884,15 @@ static int reassemble_packet(uint16_t src_mesh_id, const uint8_t *data,
     memcpy(session->buffer + session->total_len, data, len);
     session->total_len += len;
   } else {
-    /* 后续片: 跳过 FRAG_HDR */
-    if (session->total_len + len - 1 > sizeof(session->buffer)) {
+    /* 后续片: 仅追加 payload，跳过固定隧道头 */
+    uint16_t payload_len = len - TPMESH_TUNNEL_HDR_LEN;
+    if (session->total_len + payload_len > sizeof(session->buffer)) {
       session->active = false;
       return -4;
     }
-    memcpy(session->buffer + session->total_len, data + 1, len - 1);
-    session->total_len += len - 1;
+    memcpy(session->buffer + session->total_len, data + TPMESH_TUNNEL_HDR_LEN,
+           payload_len);
+    session->total_len += payload_len;
   }
 
   session->expected_seq++;
@@ -777,14 +937,14 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
       ip4_addr_t ip;
       ip4_addr_set_u32(&ip, frame->ip);
 
-      if (frame->frame_type == REG_FRAME_REGISTER) {
-        /* 注册: 添加到节点表 */
-        if (node_table_register(frame->mac, &ip, src_mesh_id) != 0) {
-          tpmesh_debug_printf("TPMesh Top: register table update failed src=0x%04X\n",
-                              src_mesh_id);
-          break;
-        }
+      /* 注册/心跳统一刷新映射，支持 Top 重启后由心跳自恢复 */
+      if (node_table_register(frame->mac, &ip, src_mesh_id) != 0) {
+        tpmesh_debug_printf("TPMesh Top: table update failed src=0x%04X\n",
+                            src_mesh_id);
+        break;
+      }
 
+      if (frame->frame_type == REG_FRAME_REGISTER) {
         /* 发送 GARP */
         send_garp(frame->mac, &ip);
 
@@ -809,9 +969,6 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
 
         tpmesh_debug_printf("TPMesh Top: DDC 0x%04X registered\n", src_mesh_id);
       } else {
-        /* 心跳: 更新活跃时间 */
-        node_table_touch(src_mesh_id);
-
         /* 发送 ACK */
         reg_frame_t ack;
         ack.frame_type = REG_FRAME_HEARTBEAT_ACK;
@@ -844,17 +1001,44 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
                             src_mesh_id);
         break;
       }
+
+      {
+        ip4_addr_t top_ip;
+        ip4_addr_set_u32(&top_ip, frame->ip);
+        if (node_table_register(frame->mac, &top_ip, src_mesh_id) != 0) {
+          tpmesh_debug_printf(
+              "TPMesh DDC: update top node entry failed src=0x%04X\n",
+              src_mesh_id);
+        }
+      }
+
       tpmesh_debug_printf("TPMesh DDC: Register ACK received\n");
       s_ddc_state = DDC_STATE_ONLINE;
       s_last_heartbeat_tick = tpmesh_get_tick_ms();
+      s_last_heartbeat_ack_tick = s_last_heartbeat_tick;
+      s_last_heartbeat_send_tick = 0;
+      s_waiting_heartbeat_ack = false;
+      s_heartbeat_miss_count = 0;
       break;
 
     case REG_FRAME_HEARTBEAT_ACK:
       if (src_mesh_id != MESH_ADDR_TOP_NODE) {
         tpmesh_debug_printf("TPMesh DDC: Ignore heartbeat ACK from 0x%04X\n",
                             src_mesh_id);
+        break;
       }
-      /* 心跳确认,无需特殊处理 */
+      {
+        ip4_addr_t top_ip;
+        ip4_addr_set_u32(&top_ip, frame->ip);
+        if (node_table_register(frame->mac, &top_ip, src_mesh_id) != 0) {
+          tpmesh_debug_printf(
+              "TPMesh DDC: refresh top node entry failed src=0x%04X\n",
+              src_mesh_id);
+        }
+      }
+      s_last_heartbeat_ack_tick = tpmesh_get_tick_ms();
+      s_waiting_heartbeat_ack = false;
+      s_heartbeat_miss_count = 0;
       break;
 
     default:
@@ -890,8 +1074,9 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
   uint16_t dst_mesh_id =
       s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
 
-  if (schc_decompress(complete_data, complete_len, eth_frame, &eth_len,
-                      src_mesh_id, dst_mesh_id) != 0) {
+  if (schc_decompress(complete_data, complete_len, eth_frame,
+                      (uint16_t)sizeof(eth_frame), &eth_len, src_mesh_id,
+                      dst_mesh_id) != 0) {
     tpmesh_debug_printf("TPMesh: Decompress failed\n");
     return;
   }
@@ -928,30 +1113,81 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
  * ============================================================================
  */
 
-static bridge_action_t check_arp_request(struct pbuf *p,
-                                         const uint8_t **target_ip) {
-  if (p->len < SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR) {
-    return BRIDGE_LOCAL;
+static bool pbuf_copy_exact(struct pbuf *p, uint16_t offset, void *dst,
+                            uint16_t len) {
+  if (p == NULL || dst == NULL) {
+    return false;
+  }
+  return pbuf_copy_partial(p, dst, len, offset) == len;
+}
+
+static bool clone_pbuf_contiguous(struct pbuf *src, struct pbuf **out) {
+  if (src == NULL || out == NULL || src->tot_len == 0) {
+    return false;
+  }
+  struct pbuf *cpy = pbuf_alloc(PBUF_RAW, src->tot_len, PBUF_RAM);
+  if (cpy == NULL) {
+    return false;
+  }
+  if (!pbuf_copy_exact(src, 0, cpy->payload, src->tot_len)) {
+    pbuf_free(cpy);
+    return false;
+  }
+  *out = cpy;
+  return true;
+}
+
+static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
+                                    bool is_broadcast, uint8_t *out_data,
+                                    uint16_t *out_len) {
+  if (eth_frame == NULL || out_data == NULL || out_len == NULL ||
+      eth_len < ETH_HDR_LEN) {
+    return -1;
   }
 
-  struct etharp_hdr *arp =
-      (struct etharp_hdr *)((uint8_t *)p->payload + SIZEOF_ETH_HDR);
+  out_data[0] = is_broadcast ? 0x80 : 0x00;
+  out_data[1] = 0x80;
+  out_data[2] = SCHC_RULE_NO_COMPRESS;
 
-  /* 只处理 ARP 请求 */
+  /* Keep full L2 identity: [SRC_MAC][DST_MAC][EtherType + Payload] */
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN, eth_frame + ETH_HWADDR_LEN,
+         ETH_HWADDR_LEN);
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN + ETH_HWADDR_LEN, eth_frame,
+         ETH_HWADDR_LEN);
+  memcpy(out_data + TPMESH_TUNNEL_HDR_LEN + (ETH_HWADDR_LEN * 2),
+         eth_frame + (ETH_HWADDR_LEN * 2), eth_len - (ETH_HWADDR_LEN * 2));
+
+  *out_len = TPMESH_TUNNEL_HDR_LEN + eth_len;
+  return 0;
+}
+
+static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
+  if (netif == NULL || netif != s_ddc_netif || !s_initialized || s_is_top_node) {
+    return ERR_IF;
+  }
+
+  return (tpmesh_bridge_forward_to_mesh(p) == 0) ? ERR_OK : ERR_IF;
+}
+
+static bridge_action_t check_arp_request(struct pbuf *p) {
+  if (p == NULL || p->tot_len < (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
+    return BRIDGE_LOCAL;
+  }
+  uint8_t arp_hdr_buf[SIZEOF_ETHARP_HDR];
+  if (!pbuf_copy_exact(p, SIZEOF_ETH_HDR, arp_hdr_buf, SIZEOF_ETHARP_HDR)) {
+    return BRIDGE_LOCAL;
+  }
+  const struct etharp_hdr *arp = (const struct etharp_hdr *)arp_hdr_buf;
   if (arp->opcode != PP_HTONS(ARP_REQUEST)) {
     return BRIDGE_LOCAL;
   }
-
-  /* 检查目标 IP 是否为 DDC */
   ip4_addr_t target;
   SMEMCPY(&target, &arp->dipaddr, sizeof(ip4_addr_t));
-
-  if (node_table_is_ddc_ip(&target)) {
-    *target_ip = (const uint8_t *)&arp->dipaddr;
-    return BRIDGE_PROXY_ARP;
+  uint16_t mesh_id = node_table_get_mesh_by_ip(&target);
+  if (mesh_id == MESH_ADDR_INVALID) {
+    return BRIDGE_LOCAL;
   }
-
-  return BRIDGE_LOCAL;
+  return node_table_is_online(mesh_id) ? BRIDGE_PROXY_ARP : BRIDGE_DROP;
 }
 
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,

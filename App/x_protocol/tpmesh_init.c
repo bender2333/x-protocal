@@ -17,6 +17,11 @@
 
 /* node_table.h 已通过 tpmesh_bridge.h 包含 */
 #include "FreeRTOS.h"
+#include "lwip/pbuf.h"
+#include "lwip/prot/etharp.h"
+#include "lwip/prot/ethernet.h"
+#include "lwip/prot/ip4.h"
+#include "lwip/prot/udp.h"
 #include "task.h"
 #include <string.h>
 
@@ -35,6 +40,8 @@ static bool s_is_top_node = false;
 static TaskHandle_t s_at_rx_task_handle = NULL;
 static TaskHandle_t s_bridge_task_handle = NULL;
 static TaskHandle_t s_heartbeat_task_handle = NULL;
+
+#define TPMESH_UART6_TAKEOVER_WAIT_MS 20
 
 /* ============================================================================
  * 公共函数
@@ -161,6 +168,16 @@ int tpmesh_module_init_ddc(void) {
     return ret;
   }
 
+  if (netif_default == NULL) {
+    tpmesh_debug_printf("TPMesh Init: DDC netif is NULL, hook failed\n");
+    return -3;
+  }
+  ret = tpmesh_bridge_attach_ddc_netif(netif_default);
+  if (ret != 0) {
+    tpmesh_debug_printf("TPMesh Init: DDC linkoutput hook failed (%d)\n", ret);
+    return ret;
+  }
+
   s_is_top_node = false;
   s_tpmesh_initialized = true;
 
@@ -194,41 +211,75 @@ void tpmesh_create_tasks(void) {
 }
 
 bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
+  (void)netif;
+
   if (!s_tpmesh_initialized || !s_is_top_node) {
     return false;
   }
+  if (!tpmesh_at_is_uart6_active()) {
+    return false;
+  }
 
-  /* 检查帧的桥接动作 */
+  /* Ingress policy is implemented in bridge module. */
   bridge_action_t action = tpmesh_bridge_check(p);
 
   switch (action) {
-  case BRIDGE_TO_MESH:
-    /* 转发到 Mesh */
-    tpmesh_bridge_forward_to_mesh(p);
-    return true; /* 已处理 */
+  case BRIDGE_TO_MESH: {
+    int ret = tpmesh_bridge_forward_to_mesh(p);
+    if (ret != 0) {
+      tpmesh_debug_printf("TPMesh Hook: forward_to_mesh failed (%d), drop\n",
+                          ret);
+    }
+    return true;
+  }
 
-  case BRIDGE_PROXY_ARP:
-    /* 代理 ARP 回复 */
-    tpmesh_bridge_send_proxy_arp(p);
-    return true; /* 已处理 */
+  case BRIDGE_PROXY_ARP: {
+    int ret = tpmesh_bridge_send_proxy_arp(p);
+    if (ret != 0) {
+      tpmesh_debug_printf("TPMesh Hook: proxy_arp failed (%d), drop\n", ret);
+    }
+    return true;
+  }
 
   case BRIDGE_DROP:
-    /* 丢弃 */
-    return true; /* 已处理 (丢弃) */
+    return true;
 
   case BRIDGE_LOCAL:
   default:
-    /* 交给 LwIP */
     return false;
   }
 }
 
 bool tpmesh_is_initialized(void) { return s_tpmesh_initialized; }
 
+int tpmesh_request_uart6_takeover(void) {
+  if (!s_tpmesh_initialized) {
+    return -1;
+  }
+
+  while (1) {
+    int ret = tpmesh_at_release_uart6();
+    if (ret == 0) {
+      return 0;
+    }
+
+    /* Busy path: block-retry until TX path drains and release succeeds. */
+    if (ret == -3 && xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+      vTaskDelay(pdMS_TO_TICKS(TPMESH_UART6_TAKEOVER_WAIT_MS));
+      continue;
+    }
+
+    tpmesh_debug_printf("TPMesh: UART6 takeover request failed (%d)\n", ret);
+    return ret;
+  }
+}
+
 void tpmesh_print_status(void) {
   tpmesh_debug_printf("\n=== TPMesh Status ===\n");
   tpmesh_debug_printf("Initialized: %s\n", s_tpmesh_initialized ? "Yes" : "No");
   tpmesh_debug_printf("Mode: %s\n", s_is_top_node ? "Top Node" : "DDC");
+  tpmesh_debug_printf("UART6 active: %s\n",
+                      tpmesh_at_is_uart6_active() ? "Yes" : "No");
 
   if (s_tpmesh_initialized) {
     tpmesh_debug_printf("Tasks:\n");

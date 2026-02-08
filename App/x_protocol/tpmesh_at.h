@@ -68,6 +68,18 @@ extern "C" {
 /** 分片发送间隔 (ms) */
 #define TPMESH_FRAG_DELAY_MS 50
 
+/**
+ * Module initialization policy.
+ * - TPMESH_MODULE_INIT_BY_X_PROTOCOL: x_protocol sends AT init sequence.
+ * - TPMESH_MODULE_INIT_BY_EXTERNAL: external module configures TPMesh module.
+ */
+#define TPMESH_MODULE_INIT_BY_X_PROTOCOL 0
+#define TPMESH_MODULE_INIT_BY_EXTERNAL 1
+
+#ifndef TPMESH_MODULE_INIT_POLICY
+#define TPMESH_MODULE_INIT_POLICY TPMESH_MODULE_INIT_BY_X_PROTOCOL
+#endif
+
 /* ============================================================================
  * AT 响应类型
  * ============================================================================
@@ -117,7 +129,7 @@ typedef void (*tpmesh_route_cb_t)(const char *event, uint16_t addr);
  *
  * @note 可在调度器启动前调用, 不发送任何 AT 命令
  *
- * @return 0=成功, -1=UART失败, -2=RTOS对象创建失败
+ * @return 0=成功, -1=UART失败, -2=RTOS对象创建失败, -3=已初始化但UART已被释放
  */
 int tpmesh_at_init(void);
 
@@ -125,6 +137,18 @@ int tpmesh_at_init(void);
  * @brief 反初始化
  */
 void tpmesh_at_deinit(void);
+
+/**
+ * @brief Release UART6 ownership for external module takeover.
+ * @return 0=success
+ */
+int tpmesh_at_release_uart6(void);
+
+/**
+ * @brief Query whether UART6 is currently owned by x_protocol AT layer.
+ * @return true=owned and usable by x_protocol
+ */
+bool tpmesh_at_is_uart6_active(void);
 
 /* ============================================================================
  * API - 命令发送 (必须在 Task 中调用)

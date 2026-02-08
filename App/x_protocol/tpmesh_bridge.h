@@ -39,6 +39,12 @@ extern "C" {
 /** 心跳间隔 (ms) */
 #define TPMESH_HEARTBEAT_MS 30000
 
+/** 心跳 ACK 超时 (ms) */
+#define TPMESH_HEARTBEAT_ACK_TIMEOUT_MS 10000
+
+/** 连续丢失心跳 ACK 阈值 */
+#define TPMESH_HEARTBEAT_MISS_MAX 3
+
 /** 注册重试间隔 (ms) */
 #define TPMESH_REGISTER_RETRY_MS 5000
 
@@ -369,7 +375,8 @@ int schc_compress(const uint8_t *eth_frame, uint16_t eth_len, uint8_t *out_data,
  * @return 0=成功
  */
 int schc_decompress(const uint8_t *mesh_data, uint16_t mesh_len,
-                    uint8_t *out_frame, uint16_t *out_len, uint16_t src_mesh_id,
+                    uint8_t *out_frame, uint16_t out_frame_size,
+                    uint16_t *out_len, uint16_t src_mesh_id,
                     uint16_t dst_mesh_id);
 
 /* ============================================================================
@@ -397,6 +404,13 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p);
  * @return 0=成功
  */
 int tpmesh_bridge_send_proxy_arp(struct pbuf *p);
+
+/**
+ * @brief 在 DDC 模式下挂接 netif->linkoutput 到 TPMesh bridge
+ * @param netif 目标 netif
+ * @return 0=成功
+ */
+int tpmesh_bridge_attach_ddc_netif(struct netif *netif);
 
 /**
  * @brief 处理来自 Mesh 的数据帧

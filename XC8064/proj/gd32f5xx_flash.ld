@@ -20,6 +20,15 @@ TASK_RAM (xrw)   : ORIGIN = 0x200F1000, LENGTH = 60K
 
 ENTRY(Reset_Handler)
 
+PHDRS
+{
+  meta PT_LOAD FLAGS(6);
+  text PT_LOAD FLAGS(5);
+  ro   PT_LOAD FLAGS(4);
+  ram  PT_LOAD FLAGS(6);
+  task PT_LOAD FLAGS(6);
+}
+
 SECTIONS
 {
   __stack_size = DEFINED(__stack_size) ? __stack_size : 8K;
@@ -33,14 +42,14 @@ SECTIONS
     . = ALIGN(4);
     __Vectors_End = .;
     __Vectors_Size = __Vectors_End - __gVectors;
-  } >FLASH
+  } >FLASH :text
   /* The program code and other data goes into FLASH */
   .flag :
   {
     . = ALIGN(4);
     KEEP(*(.flag))
     . = ALIGN(4);
-  } >PROGVALID
+  } >PROGVALID :meta
 
   /* The program code and other data goes into FLASH */
   .progname :
@@ -48,7 +57,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.progname))
     . = ALIGN(4);
-  } >PROGNAME
+  } >PROGNAME :meta
 
   /* The program code and other data goes into FLASH */
   .progversion :
@@ -56,7 +65,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.progversion))
     . = ALIGN(4);
-  } >PROGVERSION
+  } >PROGVERSION :meta
 
   /* The program code and other data goes into FLASH */
   .progid :
@@ -64,7 +73,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.progid))
     . = ALIGN(4);
-  } >PROGID
+  } >PROGID :meta
 
   /* The program code and other data goes into FLASH */
   .compiledate :
@@ -72,7 +81,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.compiledate))
     . = ALIGN(4);
-  } >COMPILEDATE
+  } >COMPILEDATE :meta
 
   /* The program code and other data goes into FLASH */
   .compiletime :
@@ -80,7 +89,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.compiletime))
     . = ALIGN(4);
-  } >COMPILETIME
+  } >COMPILETIME :meta
 
   .text :
   {
@@ -97,7 +106,7 @@ SECTIONS
     . = ALIGN(4);
     /* the symbol ��_etext�� will be defined at the end of code section */
     _etext = .;
-  } >FLASH
+  } >FLASH :text
 
   .rodata :
   {
@@ -105,43 +114,43 @@ SECTIONS
     *(.rodata)
     *(.rodata*)
     . = ALIGN(4);
-  } >FLASH
+  } >FLASH :ro
 
    .ARM.extab :
   {
      *(.ARM.extab* .gnu.linkonce.armextab.*)
-  } >FLASH
+  } >FLASH :ro
 
     .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-    } >FLASH
+    } >FLASH :ro
 
   .ARM.attributes : { *(.ARM.attributes) } > FLASH
 
-  .preinit_array :
+  .preinit_array (READONLY) :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array*))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >FLASH
+  } >FLASH :ro
 
-  .init_array :
+  .init_array (READONLY) :
   {
     PROVIDE_HIDDEN (__init_array_start = .);
     KEEP (*(SORT(.init_array.*)))
     KEEP (*(.init_array*))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >FLASH
+  } >FLASH :ro
 
-  .fini_array :
+  .fini_array (READONLY) :
   {
     PROVIDE_HIDDEN (__fini_array_start = .);
     KEEP (*(.fini_array*))
     KEEP (*(SORT(.fini_array.*)))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >FLASH
+  } >FLASH :ro
 
   /* provide some necessary symbols for startup file to initialize data */
   _sidata = LOADADDR(.data);
@@ -155,7 +164,7 @@ SECTIONS
     . = ALIGN(4);
     /* the symbol ��_edata�� will be defined at the data section end */
     _edata = .;
-  } >RAM AT> FLASH
+  } >RAM AT> FLASH :ram
 
   . = ALIGN(4);
   .bss :
@@ -170,7 +179,7 @@ SECTIONS
     /* the symbol ��_ebss�� will be defined at the bss section end */
     _ebss = .;
     __bss_end__ = _ebss;
-  } >RAM
+  } >RAM :ram
 
  . = ALIGN(8);
   PROVIDE ( end = _ebss );
@@ -179,7 +188,7 @@ SECTIONS
   .task_heap (NOLOAD) :
   {
       *(.task_heap)
-  } > TASK_RAM
+  } > TASK_RAM :task
 
   .stack ORIGIN(RAM) + LENGTH(RAM) - __stack_size :
   {
@@ -188,7 +197,7 @@ SECTIONS
     . = ORIGIN(RAM) + LENGTH(RAM) - __stack_size;
     PROVIDE( _sp = . );
     . = ALIGN(8);
-  } >RAM AT>RAM
+  } >RAM AT>RAM :ram
 
   /* .fill :
   {
@@ -203,7 +212,7 @@ SECTIONS
     . = ORIGIN(COMPILETIME) + LENGTH(COMPILETIME) - 1;
     BYTE(0x5a)
     ___rom_at = .;
-  } > COMPILETIME
+  } > COMPILETIME :meta
 }
 
  /* input sections */
