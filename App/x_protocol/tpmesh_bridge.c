@@ -16,8 +16,8 @@
 
 /* node_table.h 已通过 tpmesh_bridge.h 包含 */
 #include "FreeRTOS.h"
-#include "lwip/etharp.h"
 #include "lwip/err.h"
+#include "lwip/etharp.h"
 #include "lwip/ip.h"
 #include "lwip/netif.h"
 #include "lwip/pbuf.h"
@@ -31,7 +31,6 @@
 #include "task.h"
 #include <stdio.h>
 #include <string.h>
-
 
 /* ============================================================================
  * 类型定义
@@ -141,11 +140,15 @@ static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
                                     bool is_broadcast, uint8_t *out_data,
                                     uint16_t *out_len);
 static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p);
+static bool ddc_should_forward_arp_to_mesh(const struct etharp_hdr *arp);
+static bool ddc_should_forward_to_mesh(struct pbuf *p);
 static bridge_action_t check_arp_request(struct pbuf *p);
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
                                          const uint8_t *target_mac,
                                          const ip4_addr_t *target_ip);
 static const char *ddc_state_to_str(ddc_state_t state);
+static void trace_tunnel_packet_summary(const char *source, const uint8_t *data,
+                                        uint16_t len);
 static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
                               const uint8_t *data, uint16_t len);
 
@@ -342,8 +345,9 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
       send_source = "bridge_top_ucast";
     }
   } else {
-    if (build_no_compress_tunnel((const uint8_t *)frame->payload, frame->tot_len,
-                                 is_broadcast, tunnel_buf, &tunnel_len) != 0) {
+    if (build_no_compress_tunnel((const uint8_t *)frame->payload,
+                                 frame->tot_len, is_broadcast, tunnel_buf,
+                                 &tunnel_len) != 0) {
       ret = -2;
       goto out;
     }
@@ -590,14 +594,14 @@ void ddc_heartbeat_task(void *arg) {
       break;
 
     case DDC_STATE_ONLINE:
-      if (s_waiting_heartbeat_ack &&
-          s_last_heartbeat_send_tick > 0 &&
-          (now - s_last_heartbeat_send_tick > TPMESH_HEARTBEAT_ACK_TIMEOUT_MS)) {
+      if (s_waiting_heartbeat_ack && s_last_heartbeat_send_tick > 0 &&
+          (now - s_last_heartbeat_send_tick >
+           TPMESH_HEARTBEAT_ACK_TIMEOUT_MS)) {
         s_waiting_heartbeat_ack = false;
         s_heartbeat_miss_count++;
-        tpmesh_debug_printf(
-            "TPMesh DDC: heartbeat ACK timeout (%u/%u)\n",
-            (unsigned)s_heartbeat_miss_count, (unsigned)TPMESH_HEARTBEAT_MISS_MAX);
+        tpmesh_debug_printf("TPMesh DDC: heartbeat ACK timeout (%u/%u)\n",
+                            (unsigned)s_heartbeat_miss_count,
+                            (unsigned)TPMESH_HEARTBEAT_MISS_MAX);
         if (s_heartbeat_miss_count >= TPMESH_HEARTBEAT_MISS_MAX) {
           tpmesh_debug_printf(
               "TPMesh DDC: heartbeat lost, back to REGISTERING\n");
@@ -724,9 +728,18 @@ static void route_event_callback(const char *event, uint16_t addr) {
   if (ev == NULL) {
     return;
   }
-  while (*ev == ' ') ev++;
-
-  tpmesh_debug_printf("TPMesh Route: %s 0x%04X\n", ev, addr);
+  while (*ev == ' ')
+    ev++;
+  char ev_token[16];
+  uint8_t n = 0;
+  while (ev[n] != '\0' && ev[n] != ' ' && ev[n] != ',' && ev[n] != '[' &&
+         n < (sizeof(ev_token) - 1)) {
+    ev_token[n] = ev[n];
+    n++;
+  }
+  ev_token[n] = '\0';
+  tpmesh_debug_printf("TPMesh Route: %s 0x%04X\n",
+                      (n > 0) ? ev_token : "UNKNOWN", addr);
 
   if (!s_is_top_node && strncmp(ev, "CREATE", 6) == 0 &&
       addr == MESH_ADDR_TOP_NODE) {
@@ -767,16 +780,103 @@ static const char *ddc_state_to_str(ddc_state_t state) {
   }
 }
 
+static void trace_tunnel_packet_summary(const char *source, const uint8_t *data,
+                                        uint16_t len) {
+  const char *tag = (source != NULL) ? source : "unknown";
+
+  if (data == NULL || len < TPMESH_TUNNEL_HDR_LEN) {
+    return;
+  }
+
+  uint8_t rule = data[2];
+  uint8_t frag_hdr = data[1];
+  uint8_t seq = frag_hdr & 0x7F;
+  bool is_last = (frag_hdr & 0x80) != 0;
+  const uint8_t *payload = data + TPMESH_TUNNEL_HDR_LEN;
+  uint16_t payload_len = len - TPMESH_TUNNEL_HDR_LEN;
+
+  if (rule != SCHC_RULE_NO_COMPRESS) {
+    tpmesh_debug_printf("TPMesh AT+SEND [%s]: decoded rule=0x%02X seq=%u%s "
+                        "(compressed/control)\n",
+                        tag, (unsigned)rule, (unsigned)seq, is_last ? "L" : "");
+    return;
+  }
+
+  if (seq != 0 || payload_len < (ETH_HWADDR_LEN * 2 + 2)) {
+    tpmesh_debug_printf("TPMesh AT+SEND [%s]: decoded rule=0x00 seq=%u%s "
+                        "payload=%u (wait first fragment)\n",
+                        tag, (unsigned)seq, is_last ? "L" : "",
+                        (unsigned)payload_len);
+    return;
+  }
+
+  const uint8_t *src_mac = payload;
+  const uint8_t *dst_mac = payload + ETH_HWADDR_LEN;
+  uint16_t ethertype = (uint16_t)(((uint16_t)payload[12] << 8) | payload[13]);
+  const char *l2 = schc_is_broadcast_mac(dst_mac) ? "broadcast" : "unicast";
+
+  if (ethertype == ETHTYPE_ARP) {
+    tpmesh_debug_printf(
+        "TPMesh AT+SEND [%s]: decoded %s ARP src=%02X:%02X:%02X:%02X:%02X:%02X "
+        "dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+        tag, l2, src_mac[0], src_mac[1], src_mac[2], src_mac[3], src_mac[4],
+        src_mac[5], dst_mac[0], dst_mac[1], dst_mac[2], dst_mac[3], dst_mac[4],
+        dst_mac[5]);
+    return;
+  }
+
+  if (ethertype != ETHTYPE_IP || payload_len < (ETH_HDR_LEN + IP_HLEN)) {
+    tpmesh_debug_printf(
+        "TPMesh AT+SEND [%s]: decoded %s eth=0x%04X payload=%u\n", tag, l2,
+        ethertype, (unsigned)payload_len);
+    return;
+  }
+
+  const uint8_t *ip = payload + ETH_HDR_LEN;
+  uint8_t version = (uint8_t)((ip[0] >> 4) & 0x0F);
+  uint8_t ihl = (uint8_t)((ip[0] & 0x0F) * 4U);
+
+  if (version != 4 || ihl < IP_HLEN || payload_len < (ETH_HDR_LEN + ihl)) {
+    tpmesh_debug_printf(
+        "TPMesh AT+SEND [%s]: decoded %s IPv4 malformed ihl=%u payload=%u\n",
+        tag, l2, (unsigned)ihl, (unsigned)payload_len);
+    return;
+  }
+
+  uint8_t proto = ip[9];
+  const uint8_t *src_ip = ip + 12;
+  const uint8_t *dst_ip = ip + 16;
+
+  if (proto == IP_PROTO_UDP && payload_len >= (ETH_HDR_LEN + ihl + UDP_HLEN)) {
+    const uint8_t *udp = ip + ihl;
+    uint16_t sport = (uint16_t)(((uint16_t)udp[0] << 8) | udp[1]);
+    uint16_t dport = (uint16_t)(((uint16_t)udp[2] << 8) | udp[3]);
+    tpmesh_debug_printf("TPMesh AT+SEND [%s]: decoded %s IPv4 UDP "
+                        "%u.%u.%u.%u:%u -> %u.%u.%u.%u:%u\n",
+                        tag, l2, src_ip[0], src_ip[1], src_ip[2], src_ip[3],
+                        (unsigned)sport, dst_ip[0], dst_ip[1], dst_ip[2],
+                        dst_ip[3], (unsigned)dport);
+    return;
+  }
+
+  tpmesh_debug_printf("TPMesh AT+SEND [%s]: decoded %s IPv4 proto=%u "
+                      "%u.%u.%u.%u -> %u.%u.%u.%u\n",
+                      tag, l2, (unsigned)proto, src_ip[0], src_ip[1], src_ip[2],
+                      src_ip[3], dst_ip[0], dst_ip[1], dst_ip[2], dst_ip[3]);
+}
+
 static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
                               const uint8_t *data, uint16_t len) {
   const char *tag = (source != NULL) ? source : "unknown";
-  uint8_t rule = (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) ? data[2] : 0xFF;
+  uint8_t rule =
+      (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) ? data[2] : 0xFF;
   const char *role = s_is_top_node ? "TOP" : "DDC";
   const char *state = s_is_top_node ? "-" : ddc_state_to_str(s_ddc_state);
 
   tpmesh_debug_printf(
       "TPMesh AT+SEND [%s]: role=%s state=%s dst=0x%04X len=%u rule=0x%02X\n",
       tag, role, state, dest_mesh_id, (unsigned)len, (unsigned)rule);
+  trace_tunnel_packet_summary(tag, data, len);
 
   int ret = tpmesh_at_send(dest_mesh_id, data, len);
   if (ret != 0) {
@@ -1013,8 +1113,8 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         memcpy(buf + 3, &ack, sizeof(ack));
         if (at_send_with_trace("top_register_ack", src_mesh_id, buf,
                                3 + sizeof(ack)) != 0) {
-          tpmesh_debug_printf("TPMesh Top: register ACK send failed dst=0x%04X\n",
-                              src_mesh_id);
+          tpmesh_debug_printf(
+              "TPMesh Top: register ACK send failed dst=0x%04X\n", src_mesh_id);
           break;
         }
 
@@ -1035,8 +1135,9 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         memcpy(buf + 3, &ack, sizeof(ack));
         if (at_send_with_trace("top_heartbeat_ack", src_mesh_id, buf,
                                3 + sizeof(ack)) != 0) {
-          tpmesh_debug_printf("TPMesh Top: heartbeat ACK send failed dst=0x%04X\n",
-                              src_mesh_id);
+          tpmesh_debug_printf(
+              "TPMesh Top: heartbeat ACK send failed dst=0x%04X\n",
+              src_mesh_id);
         }
       }
       break;
@@ -1157,8 +1258,9 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
       if (p) {
         memcpy(p->payload, eth_frame, eth_len);
         if (ddc_netif->input(p, ddc_netif) != ERR_OK) {
-          tpmesh_debug_printf("TPMesh DDC: netif input failed len=%u src=0x%04X\n",
-                              eth_len, src_mesh_id);
+          tpmesh_debug_printf(
+              "TPMesh DDC: netif input failed len=%u src=0x%04X\n", eth_len,
+              src_mesh_id);
           pbuf_free(p);
         }
       }
@@ -1219,6 +1321,81 @@ static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
   return 0;
 }
 
+static bool ddc_should_forward_arp_to_mesh(const struct etharp_hdr *arp) {
+  if (arp == NULL || arp->opcode != PP_HTONS(ARP_REQUEST)) {
+    return false;
+  }
+
+  ip4_addr_t sip;
+  ip4_addr_t dip;
+  SMEMCPY(&sip, &arp->sipaddr, sizeof(ip4_addr_t));
+  SMEMCPY(&dip, &arp->dipaddr, sizeof(ip4_addr_t));
+
+  uint32_t sip_u32 = ip4_addr_get_u32(&sip);
+  uint32_t dip_u32 = ip4_addr_get_u32(&dip);
+
+  if (dip_u32 == 0U || dip_u32 == 0xFFFFFFFFUL) {
+    return false;
+  }
+  if (sip_u32 == 0U || sip_u32 == dip_u32) {
+    return false;
+  }
+  return true;
+}
+
+static bool ddc_should_forward_to_mesh(struct pbuf *p) {
+  if (p == NULL || p->tot_len < SIZEOF_ETH_HDR) {
+    return false;
+  }
+
+  bool forward = false;
+  struct pbuf *contig = NULL;
+  struct pbuf *frame = p;
+
+  if (p->len < p->tot_len) {
+    if (!clone_pbuf_contiguous(p, &contig)) {
+      return false;
+    }
+    frame = contig;
+  }
+
+  const struct eth_hdr *eth = (const struct eth_hdr *)frame->payload;
+  uint16_t ethertype = lwip_ntohs(eth->type);
+
+  if (ethertype == ETHTYPE_ARP &&
+      frame->tot_len >= (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
+    const struct etharp_hdr *arp = (const struct etharp_hdr
+                                        *)((const uint8_t *)frame->payload +
+                                           SIZEOF_ETH_HDR);
+    forward = ddc_should_forward_arp_to_mesh(arp);
+    goto out;
+  }
+
+  if (ethertype == ETHTYPE_IP &&
+      frame->tot_len >= (SIZEOF_ETH_HDR + IP_HLEN + UDP_HLEN)) {
+    const struct ip_hdr *iph =
+        (const struct ip_hdr *)((const uint8_t *)frame->payload + SIZEOF_ETH_HDR);
+    uint16_t ihl = IPH_HL_BYTES(iph);
+    if (ihl >= IP_HLEN && ihl <= IP_HLEN_MAX &&
+        frame->tot_len >= (SIZEOF_ETH_HDR + ihl + UDP_HLEN) &&
+        IPH_PROTO(iph) == IP_PROTO_UDP) {
+      const struct udp_hdr *udph =
+          (const struct udp_hdr *)((const uint8_t *)iph + ihl);
+      uint16_t dport = lwip_ntohs(udph->dest);
+      uint16_t sport = lwip_ntohs(udph->src);
+      if (dport == TPMESH_PORT_BACNET || sport == TPMESH_PORT_BACNET) {
+        forward = true;
+      }
+    }
+  }
+
+out:
+  if (contig != NULL) {
+    pbuf_free(contig);
+  }
+  return forward;
+}
+
 static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
   if (netif == NULL || netif != s_ddc_netif || !s_initialized || s_is_top_node) {
     return ERR_IF;
@@ -1236,7 +1413,10 @@ static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
     return ERR_IF;
   }
 
-  return (tpmesh_bridge_forward_to_mesh(p) == 0) ? ERR_OK : ERR_IF;
+  return ddc_should_forward_to_mesh(p) &&
+                 (tpmesh_bridge_forward_to_mesh(p) == 0)
+             ? ERR_OK
+             : ERR_IF;
 }
 
 static bridge_action_t check_arp_request(struct pbuf *p) {

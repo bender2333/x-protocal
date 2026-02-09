@@ -146,7 +146,11 @@ int tpmesh_debug_printf(const char *fmt, ...)
     va_end(args);
 
     if (len > 0) {
-        for (int i = 0; i < len; i++) {
+        int out_len = len;
+        if (out_len >= (int)sizeof(buf)) {
+            out_len = (int)sizeof(buf) - 1;
+        }
+        for (int i = 0; i < out_len; i++) {
             tpmesh_debug_putc(buf[i]);
         }
     }
