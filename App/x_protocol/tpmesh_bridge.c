@@ -95,6 +95,7 @@ static volatile uint8_t s_heartbeat_miss_count = 0;
 
 /** 当前是否等待心跳 ACK */
 static volatile bool s_waiting_heartbeat_ack = false;
+static volatile uint32_t s_last_ddc_preonline_drop_log_tick = 0;
 
 /** 广播限速器 */
 static rate_limiter_t s_rate_limiter = {0, 0};
@@ -124,7 +125,7 @@ static void mesh_data_callback(uint16_t src_mesh_id, const uint8_t *data,
                                uint16_t len);
 static void route_event_callback(const char *event, uint16_t addr);
 static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
-                             uint16_t len);
+                             uint16_t len, const char *source);
 static int reassemble_packet(uint16_t src_mesh_id, const uint8_t *data,
                              uint16_t len, uint8_t **out_data,
                              uint16_t *out_len);
@@ -144,6 +145,9 @@ static bridge_action_t check_arp_request(struct pbuf *p);
 static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
                                          const uint8_t *target_mac,
                                          const ip4_addr_t *target_ip);
+static const char *ddc_state_to_str(ddc_state_t state);
+static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
+                              const uint8_t *data, uint16_t len);
 
 /* ============================================================================
  * 公共函数 - 初始化
@@ -310,6 +314,7 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
   uint8_t tunnel_buf[1600];
   uint16_t tunnel_len;
   uint16_t dest_mesh_id;
+  const char *send_source;
 
   if (s_is_top_node) {
     if (schc_compress((uint8_t *)frame->payload, frame->tot_len, tunnel_buf,
@@ -325,6 +330,7 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
         goto out;
       }
       dest_mesh_id = MESH_ADDR_BROADCAST;
+      send_source = "bridge_top_bcast";
     } else {
       dest_mesh_id = node_table_get_mesh_by_mac((uint8_t *)&eth->dest);
       if (dest_mesh_id == MESH_ADDR_INVALID ||
@@ -333,6 +339,7 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
         ret = -4;
         goto out;
       }
+      send_source = "bridge_top_ucast";
     }
   } else {
     if (build_no_compress_tunnel((const uint8_t *)frame->payload, frame->tot_len,
@@ -341,9 +348,10 @@ int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
       goto out;
     }
     dest_mesh_id = MESH_ADDR_TOP_NODE;
+    send_source = "bridge_ddc_to_top";
   }
 
-  ret = fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len);
+  ret = fragment_and_send(dest_mesh_id, tunnel_buf, tunnel_len, send_source);
 out:
   if (contig != NULL) {
     pbuf_free(contig);
@@ -510,8 +518,8 @@ int ddc_send_register(const ddc_config_t *config) {
   tunnel_buf[2] = SCHC_RULE_REGISTER;
   memcpy(tunnel_buf + 3, &frame, sizeof(frame));
 
-  tpmesh_debug_printf("TPMesh DDC: Sending register to Top Node\n");
-  return tpmesh_at_send(MESH_ADDR_TOP_NODE, tunnel_buf, 3 + sizeof(frame));
+  return at_send_with_trace("ddc_register", MESH_ADDR_TOP_NODE, tunnel_buf,
+                            3 + sizeof(frame));
 }
 
 int ddc_send_heartbeat(const ddc_config_t *config) {
@@ -532,7 +540,8 @@ int ddc_send_heartbeat(const ddc_config_t *config) {
   tunnel_buf[2] = SCHC_RULE_REGISTER;
   memcpy(tunnel_buf + 3, &frame, sizeof(frame));
 
-  return tpmesh_at_send(MESH_ADDR_TOP_NODE, tunnel_buf, 3 + sizeof(frame));
+  return at_send_with_trace("ddc_heartbeat", MESH_ADDR_TOP_NODE, tunnel_buf,
+                            3 + sizeof(frame));
 }
 
 void ddc_heartbeat_task(void *arg) {
@@ -559,6 +568,11 @@ void ddc_heartbeat_task(void *arg) {
         if (s_register_retry_count < TPMESH_REGISTER_MAX_RETRIES) {
           if (ddc_send_register(&s_ddc_config) != 0) {
             tpmesh_debug_printf("TPMesh DDC: register send failed\n");
+          } else {
+            tpmesh_debug_printf(
+                "TPMesh DDC: register sent, waiting ACK (try=%u/%u)\n",
+                (unsigned)(s_register_retry_count + 1),
+                (unsigned)TPMESH_REGISTER_MAX_RETRIES);
           }
           s_last_register_tick = now;
           s_register_retry_count++;
@@ -740,8 +754,39 @@ static void route_event_callback(const char *event, uint16_t addr) {
  * ============================================================================
  */
 
+static const char *ddc_state_to_str(ddc_state_t state) {
+  switch (state) {
+  case DDC_STATE_INIT:
+    return "INIT";
+  case DDC_STATE_REGISTERING:
+    return "REGISTERING";
+  case DDC_STATE_ONLINE:
+    return "ONLINE";
+  default:
+    return "UNKNOWN";
+  }
+}
+
+static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
+                              const uint8_t *data, uint16_t len) {
+  const char *tag = (source != NULL) ? source : "unknown";
+  uint8_t rule = (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) ? data[2] : 0xFF;
+  const char *role = s_is_top_node ? "TOP" : "DDC";
+  const char *state = s_is_top_node ? "-" : ddc_state_to_str(s_ddc_state);
+
+  tpmesh_debug_printf(
+      "TPMesh AT+SEND [%s]: role=%s state=%s dst=0x%04X len=%u rule=0x%02X\n",
+      tag, role, state, dest_mesh_id, (unsigned)len, (unsigned)rule);
+
+  int ret = tpmesh_at_send(dest_mesh_id, data, len);
+  if (ret != 0) {
+    tpmesh_debug_printf("TPMesh AT+SEND [%s]: send failed ret=%d\n", tag, ret);
+  }
+  return ret;
+}
+
 static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
-                             uint16_t len) {
+                             uint16_t len, const char *source) {
   if (!tpmesh_at_is_uart6_active()) {
     return -2;
   }
@@ -777,9 +822,14 @@ static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
     if (seq > 0x7F) {
       return -1;
     }
-    packet[1] = ((offset >= len) ? 0x80 : 0x00) | (seq & 0x7F);
+    bool is_last = (offset >= len);
+    packet[1] = (is_last ? 0x80 : 0x00) | (seq & 0x7F);
 
-    if (tpmesh_at_send(dest_mesh_id, packet, chunk_len) != 0) {
+    char trace_tag[48];
+    const char *base = (source != NULL) ? source : "bridge_data";
+    snprintf(trace_tag, sizeof(trace_tag), "%s:frag%u%s", base, (unsigned)seq,
+             is_last ? "L" : "");
+    if (at_send_with_trace(trace_tag, dest_mesh_id, packet, chunk_len) != 0) {
       return -1;
     }
 
@@ -961,7 +1011,8 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         buf[1] = 0x80;
         buf[2] = SCHC_RULE_REGISTER;
         memcpy(buf + 3, &ack, sizeof(ack));
-        if (tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack)) != 0) {
+        if (at_send_with_trace("top_register_ack", src_mesh_id, buf,
+                               3 + sizeof(ack)) != 0) {
           tpmesh_debug_printf("TPMesh Top: register ACK send failed dst=0x%04X\n",
                               src_mesh_id);
           break;
@@ -982,7 +1033,8 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
         buf[1] = 0x80;
         buf[2] = SCHC_RULE_REGISTER;
         memcpy(buf + 3, &ack, sizeof(ack));
-        if (tpmesh_at_send(src_mesh_id, buf, 3 + sizeof(ack)) != 0) {
+        if (at_send_with_trace("top_heartbeat_ack", src_mesh_id, buf,
+                               3 + sizeof(ack)) != 0) {
           tpmesh_debug_printf("TPMesh Top: heartbeat ACK send failed dst=0x%04X\n",
                               src_mesh_id);
         }
@@ -994,6 +1046,12 @@ static void process_register_frame(uint16_t src_mesh_id, const uint8_t *data,
     }
   } else {
     /* DDC 处理 ACK */
+    if (frame->frame_type == REG_FRAME_REGISTER_ACK ||
+        frame->frame_type == REG_FRAME_HEARTBEAT_ACK) {
+      tpmesh_debug_printf(
+          "TPMesh DDC: ACK frame type=%u from src=0x%04X (expect=0x%04X)\n",
+          (unsigned)frame->frame_type, src_mesh_id, MESH_ADDR_TOP_NODE);
+    }
     switch (frame->frame_type) {
     case REG_FRAME_REGISTER_ACK:
       if (src_mesh_id != MESH_ADDR_TOP_NODE) {
@@ -1163,6 +1221,18 @@ static int build_no_compress_tunnel(const uint8_t *eth_frame, uint16_t eth_len,
 
 static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
   if (netif == NULL || netif != s_ddc_netif || !s_initialized || s_is_top_node) {
+    return ERR_IF;
+  }
+
+  if (s_ddc_state != DDC_STATE_ONLINE) {
+    uint32_t now = tpmesh_get_tick_ms();
+    if ((s_last_ddc_preonline_drop_log_tick == 0) ||
+        (now - s_last_ddc_preonline_drop_log_tick > 1000)) {
+      s_last_ddc_preonline_drop_log_tick = now;
+      tpmesh_debug_printf(
+          "TPMesh DDC: drop linkoutput while state=%s (not registered)\n",
+          ddc_state_to_str(s_ddc_state));
+    }
     return ERR_IF;
   }
 
