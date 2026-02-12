@@ -31,14 +31,15 @@ extern "C" {
  *   1 = Top Node 模式 (以太网桥接到 Mesh)
  *   2 = DDC 节点模式 (通过 Mesh 连接)
  */
+
 #ifndef TPMESH_MODE
-#define TPMESH_MODE 2 /* 默认禁用 TPMesh */
+#define TPMESH_MODE 1 /* 默认禁用 TPMesh */
 #endif
 
 #define TPMESH_MODE_DISABLED 0
 #define TPMESH_MODE_TOP_NODE 1
 #define TPMESH_MODE_DDC 2
-
+#define TPMESH_MODE TPMESH_MODE_TOP_NODE
 typedef enum {
   TPMESH_ROLE_NODE = 0,
   TPMESH_ROLE_TOP = 1,
@@ -117,7 +118,7 @@ int tpmesh_module_init_top(struct netif *eth_netif);
  *
  * @return 0=成功
  */
-int tpmesh_module_init_ddc(void);
+int tpmesh_module_init_edge(void);
 
 /**
  * @brief 创建 TPMesh 相关任务

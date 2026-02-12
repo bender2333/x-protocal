@@ -304,7 +304,7 @@ int main(void) {
     }
   }
 #elif (TPMESH_MODE == TPMESH_MODE_DDC)
-  tpmesh_module_init_ddc();
+  tpmesh_module_init_edge();
 #else
   /* TPMESH_MODE_DISABLED: 正常以太网模式, 不初始化 TPMesh */
 #endif

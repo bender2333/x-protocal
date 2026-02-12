@@ -397,6 +397,7 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
     return -4;
   }
   tpmesh_module_reset();
+  vTaskDelay(pdMS_TO_TICKS(1000)); /* 等待模组重启 */
   tpmesh_debug_printf("Module: Init OK\n");
   return 0;
 }

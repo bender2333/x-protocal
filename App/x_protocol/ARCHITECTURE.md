@@ -186,8 +186,8 @@
   - `frame_type:1`
   - `mac:6`
   - `ip:4`（网络序）
-  - `mesh_id:2`
-  - `crc16:2`
+  - `mesh_id:2`（当前实现按 MCU 原生字节序，GD32 为小端）
+  - `crc16:2`（当前实现按 MCU 原生字节序，GD32 为小端）
 - 控制类型：
   - `0x01` Register
   - `0x02` Register ACK
@@ -205,6 +205,178 @@
 - `RULE_ID=0x02` (`IP_ONLY`)：
   - `PAYLOAD=[SRC_MAC:6][IP_PAYLOAD]`
   - 仅在满足规则时使用，否则回退 `NO_COMPRESS`。
+
+### 6.7 Mesh 帧格式定义（字节级）
+
+本节定义 `AT+SEND` / `+NNMI` 中 `HEX_DATA` 的字节格式（即 Mesh 隧道帧）。
+
+- `SRC_MESH_ID` 不在 `HEX_DATA` 内，来自 `+NNMI` 头字段。
+- `DEST_MESH_ID` 不在 `HEX_DATA` 内，来自 `AT+SEND=<DEST,...>` 的 `DEST`。
+- 统一头长度固定为 `3` 字节（`TPMESH_TUNNEL_HDR_LEN`）。
+
+通用格式：
+
+`[L2_HDR:1][FRAG_HDR:1][RULE_ID:1][PAYLOAD:N]`
+
+字段定义（按字节偏移）：
+
+| 偏移 | 字段 | 长度 | 定义 |
+|---:|---|---:|---|
+| 0 | `L2_HDR` | 1 | bit7=`1` 表示广播，bit[6:0] 保留（当前发送为 0） |
+| 1 | `FRAG_HDR` | 1 | bit7=`last`，bit[6:0]=`seq` |
+| 2 | `RULE_ID` | 1 | `0x00/0x01/0x02/0x10` |
+| 3.. | `PAYLOAD` | N | 由 `RULE_ID` 决定 |
+
+分片约束：
+
+- `seq=0` 为首片；`seq>0` 为后续片。
+- 所有分片都保留完整 3 字节头（不是短头格式）。
+- 重组要求 `seq` 连续，且后续片 `L2_HDR/RULE_ID` 与首片一致，否则丢弃当前会话。
+
+`RULE_ID=0x00`（`NO_COMPRESS`）载荷：
+
+| 偏移（相对整帧） | 字段 | 长度 |
+|---:|---|---:|
+| 3 | `SRC_MAC` | 6 |
+| 9 | `DST_MAC` | 6 |
+| 15 | `ETH_PAYLOAD_FROM_ETHERTYPE` | 可变 |
+
+说明：
+
+- `ETH_PAYLOAD_FROM_ETHERTYPE` 从以太帧 EtherType 开始（即原始帧 `eth[12...]`）。
+- 解压后可无损还原原始以太网帧。
+
+`RULE_ID=0x01`（`BACNET_IP`）载荷：
+
+| 偏移（相对整帧） | 字段 | 长度 |
+|---:|---|---:|
+| 3 | `SRC_MAC` | 6 |
+| 9 | `UDP_PAYLOAD` | 可变 |
+
+说明：
+
+- 该规则用于 BACnet/IP（UDP 47808）。
+- 解压时重建 Ethernet + IPv4 + UDP 头（UDP 源/目的端口均为 47808）。
+
+`RULE_ID=0x02`（`IP_ONLY`）载荷：
+
+| 偏移（相对整帧） | 字段 | 长度 |
+|---:|---|---:|
+| 3 | `SRC_MAC` | 6 |
+| 9 | `IP_PAYLOAD` | 可变 |
+
+说明：
+
+- 该规则仅用于 UDP 且目的端口非 47808 的 IPv4 报文。
+- 解压时重建 Ethernet + IPv4 头，`IP proto` 按当前实现固定为 UDP。
+
+`RULE_ID=0x10`（`REGISTER`）载荷：
+
+`[frame_type:1][mac:6][ip:4][mesh_id:2][crc16:2]`
+
+按整帧偏移：
+
+| 偏移 | 字段 | 长度 |
+|---:|---|---:|
+| 3 | `frame_type` | 1 |
+| 4 | `mac` | 6 |
+| 10 | `ip` | 4 |
+| 14 | `mesh_id` | 2 |
+| 16 | `crc16` | 2 |
+
+常见单片总长度：`3 + 15 = 18` 字节（`FRAG_HDR=0x80`，`seq=0,last=1`）。
+
+### 6.8 报文实例解析（典型帧）
+
+#### 6.8.1 Edge -> Top 心跳（`+NNMI`）
+
+原始报文：
+
+- `+NNMI:0002,FFFE,-71,18,0080100318A788030030C0A80A0B02009F2D`
+
+链路层字段：
+
+- `SRC=0x0002`（来自 `+NNMI` 头，不在 `HEX_DATA`）
+- `DEST=0xFFFE`（来自 `+NNMI` 头，不在 `HEX_DATA`）
+- `RSSI=-71`
+- `LEN=18`
+
+`HEX_DATA` 按字节拆分：
+
+`00 80 10 03 18 A7 88 03 00 30 C0 A8 0A 0B 02 00 9F 2D`
+
+| 偏移 | 字节 | 含义 |
+|---:|---|---|
+| 0 | `00` | `L2_HDR`，单播 |
+| 1 | `80` | `FRAG_HDR`，`last=1`，`seq=0` |
+| 2 | `10` | `RULE_ID=SCHC_RULE_REGISTER` |
+| 3 | `03` | `frame_type=HEARTBEAT` |
+| 4..9 | `18 A7 88 03 00 30` | `mac=18:A7:88:03:00:30` |
+| 10..13 | `C0 A8 0A 0B` | `ip=192.168.10.11`（网络序） |
+| 14..15 | `02 00` | `mesh_id=0x0002`（当前实现按小端存取） |
+| 16..17 | `9F 2D` | `crc16=0x2D9F`（当前实现按小端存取） |
+
+结论：
+
+- 该帧是 Edge(`0x0002`) 发给 Top(`0xFFFE`) 的单片心跳帧。
+
+#### 6.8.2 Top -> Edge 心跳 ACK（`AT+SEND`）
+
+原始命令：
+
+- `AT+SEND=0002,18,00801004006BA0000010C0A80A0AFEFF922B,0`
+
+链路层字段：
+
+- `DEST=0x0002`（来自 `AT+SEND` 目的地址）
+- `LEN=18`
+
+`HEX_DATA` 按字节拆分：
+
+`00 80 10 04 00 6B A0 00 00 10 C0 A8 0A 0A FE FF 92 2B`
+
+| 偏移 | 字节 | 含义 |
+|---:|---|---|
+| 0 | `00` | `L2_HDR`，单播 |
+| 1 | `80` | `FRAG_HDR`，`last=1`，`seq=0` |
+| 2 | `10` | `RULE_ID=SCHC_RULE_REGISTER` |
+| 3 | `04` | `frame_type=HEARTBEAT_ACK` |
+| 4..9 | `00 6B A0 00 00 10` | `mac=00:6B:A0:00:00:10`（Top） |
+| 10..13 | `C0 A8 0A 0A` | `ip=192.168.10.10`（Top） |
+| 14..15 | `FE FF` | `mesh_id=0xFFFE`（当前实现按小端存取） |
+| 16..17 | `92 2B` | `crc16=0x2B92`（当前实现按小端存取） |
+
+结论：
+
+- 该帧是 Top 对 Edge 心跳的 ACK，内容与 Top 身份（MAC/IP/MeshID）一致。
+
+#### 6.8.3 Top -> Mesh 广播业务帧（`AT+SEND`, `RULE_ID=0x01`）
+
+原始命令：
+
+- `AT+SEND=0000,27,808001C853092E31D9810B000C0120FFFF00FF1008000000000000,0`
+
+链路层字段：
+
+- `DEST=0x0000`（Mesh 广播地址）
+- `LEN=27`
+
+`HEX_DATA` 按字节拆分：
+
+`80 80 01 C8 53 09 2E 31 D9 81 0B 00 0C 01 20 FF FF 00 FF 10 08 00 00 00 00 00 00`
+
+| 偏移 | 字节 | 含义 |
+|---:|---|---|
+| 0 | `80` | `L2_HDR`，广播（bit7=1） |
+| 1 | `80` | `FRAG_HDR`，`last=1`，`seq=0` |
+| 2 | `01` | `RULE_ID=SCHC_RULE_BACNET_IP` |
+| 3..8 | `C8 53 09 2E 31 D9` | `SRC_MAC=C8:53:09:2E:31:D9` |
+| 9..26 | `81 0B 00 0C 01 20 FF FF 00 FF 10 08 00 00 00 00 00 00` | `UDP_PAYLOAD`（18 字节） |
+
+结论：
+
+- 该帧是 Top 侧发往 Mesh 全网的单片广播业务帧。
+- 因 `RULE_ID=0x01`，该帧未携带 IP/UDP 头，接收端解压时会按 BACnet/IP 规则重建 IPv4/UDP 头后再入栈。
 
 ## 7. UART6 接管模型（最终）
 
@@ -343,3 +515,6 @@ UART API（`tpmesh_uart.h`）：
 | V0.8.2 | 2026-02-08 | 分片契约统一、Top/Edge 数据流闭环修复 |
 | V0.8.3 | 2026-02-08 | UART6 收敛为单向接管 + 重启模型 |
 | V0.9 | 2026-02-12 | 引入 role+run_state 运行时模型；Top 入站改 local-first tap；Edge 出站改选择性 Mesh + PHY fallback |
+| V0.9.1 | 2026-02-12 | 补充 Mesh 帧字节级格式定义（通用头/各 Rule 载荷/偏移） |
+| V0.9.2 | 2026-02-12 | 补充真实报文样例逐字节解析（NNMI 心跳与 AT+SEND 心跳 ACK） |
+| V0.9.3 | 2026-02-12 | 补充广播业务帧样例解析（AT+SEND DEST=0x0000, RULE_ID=0x01） |

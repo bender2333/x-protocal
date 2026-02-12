@@ -37,7 +37,7 @@ extern "C" {
 #define TPMESH_NODE_TIMEOUT_MS 90000
 
 /** 心跳间隔 (ms) */
-#define TPMESH_HEARTBEAT_MS 30000
+#define TPMESH_HEARTBEAT_MS 60000
 
 /** 心跳 ACK 超时 (ms) */
 #define TPMESH_HEARTBEAT_ACK_TIMEOUT_MS 10000

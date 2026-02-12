@@ -199,6 +199,21 @@ int node_table_register(const uint8_t *mac, const ip4_addr_t *ip, uint16_t mesh_
     }
 
     node_entry_t *entry = &s_node_table[idx];
+    uint8_t old_valid = entry->valid;
+    uint8_t old_mac[6] = {0};
+    ip4_addr_t old_ip;
+    uint16_t old_mesh_id = 0;
+    uint8_t old_source = 0;
+    uint8_t old_online = 0;
+
+    if (old_valid) {
+        memcpy(old_mac, entry->mac, sizeof(old_mac));
+        ip4_addr_copy(old_ip, entry->ip);
+        old_mesh_id = entry->mesh_id;
+        old_source = entry->source;
+        old_online = entry->online;
+    }
+
     entry->valid = 1;
     memcpy(entry->mac, mac, 6);
     ip4_addr_copy(entry->ip, *ip);
@@ -207,12 +222,22 @@ int node_table_register(const uint8_t *mac, const ip4_addr_t *ip, uint16_t mesh_
     entry->source = NODE_SOURCE_REGISTER;
     entry->online = 1;
 
+    bool mapping_changed =
+        (!old_valid) ||
+        (!mac_equal(old_mac, mac)) ||
+        (!ip4_addr_cmp(&old_ip, ip)) ||
+        (old_mesh_id != mesh_id) ||
+        (old_source != NODE_SOURCE_REGISTER) ||
+        (old_online != 1);
+
     xSemaphoreGive(s_table_mutex);
 
-    tpmesh_debug_printf("NodeTable: Registered 0x%04X MAC=%02X:%02X:%02X:%02X:%02X:%02X IP=%d.%d.%d.%d\n",
-           mesh_id,
-           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-           ip4_addr1(ip), ip4_addr2(ip), ip4_addr3(ip), ip4_addr4(ip));
+    if (mapping_changed) {
+        tpmesh_debug_printf("NodeTable: Registered 0x%04X MAC=%02X:%02X:%02X:%02X:%02X:%02X IP=%d.%d.%d.%d\n",
+               mesh_id,
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+               ip4_addr1(ip), ip4_addr2(ip), ip4_addr3(ip), ip4_addr4(ip));
+    }
     return 0;
 }
 

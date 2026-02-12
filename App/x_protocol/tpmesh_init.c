@@ -127,7 +127,7 @@ int tpmesh_module_init_top(struct netif *eth_netif) {
   return 0;
 }
 
-int tpmesh_module_init_ddc(void) {
+int tpmesh_module_init_edge(void) {
   if (s_tpmesh_initialized) {
     return 0;
   }
