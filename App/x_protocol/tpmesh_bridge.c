@@ -155,6 +155,8 @@ static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
 static const char *ddc_state_to_str(ddc_state_t state);
 static void trace_tunnel_packet_summary(const char *source, const uint8_t *data,
                                         uint16_t len);
+static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
+                                   uint16_t len);
 static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
                               const uint8_t *data, uint16_t len);
 static uint16_t ip_checksum16(const uint8_t *buf, uint16_t len);
@@ -1010,9 +1012,9 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
       (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) ? data[2] : 0xFF;
   const char *role = s_is_top_node ? "TOP" : "DDC";
   const char *state = s_is_top_node ? "-" : ddc_state_to_str(s_ddc_state);
-  bool compact_top_hb = (strcmp(tag, "top_heartbeat_ack") == 0);
+  bool compact_control_rule = (rule == SCHC_RULE_REGISTER);
 
-  if (compact_top_hb) {
+  if (compact_control_rule) {
     if (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) {
       uint8_t frag_hdr = data[1];
       uint8_t seq = frag_hdr & 0x7F;
@@ -1040,6 +1042,82 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
     tpmesh_debug_printf("TPMesh AT+SEND [%s]: send failed ret=%d\n", tag, ret);
   }
   return ret;
+}
+
+static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
+                                   uint16_t len) {
+  if (frame == NULL || len < ETH_HDR_LEN) {
+    tpmesh_debug_printf("TPMesh DDC RX inject: invalid frame src=0x%04X len=%u\n",
+                        src_mesh_id, (unsigned)len);
+    return;
+  }
+
+  const uint8_t *dst_mac = frame;
+  const uint8_t *src_mac = frame + ETH_HWADDR_LEN;
+  uint16_t ethertype = (uint16_t)(((uint16_t)frame[12] << 8) | frame[13]);
+  const char *l2 = schc_is_broadcast_mac(dst_mac) ? "broadcast" : "unicast";
+
+  tpmesh_debug_printf(
+      "TPMesh DDC RX inject: src=0x%04X len=%u %s eth=0x%04X src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+      src_mesh_id, (unsigned)len, l2, (unsigned)ethertype, src_mac[0],
+      src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5], dst_mac[0],
+      dst_mac[1], dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
+
+  if (ethertype == ETHTYPE_ARP) {
+    if (len < (ETH_HDR_LEN + SIZEOF_ETHARP_HDR)) {
+      tpmesh_debug_printf(
+          "TPMesh DDC RX inject: ARP short frame len=%u need=%u\n",
+          (unsigned)len, (unsigned)(ETH_HDR_LEN + SIZEOF_ETHARP_HDR));
+      return;
+    }
+
+    const struct etharp_hdr *arp =
+        (const struct etharp_hdr *)(frame + ETH_HDR_LEN);
+    const ip4_addr_t *sip = (const ip4_addr_t *)&arp->sipaddr;
+    const ip4_addr_t *dip = (const ip4_addr_t *)&arp->dipaddr;
+    tpmesh_debug_printf(
+        "TPMesh DDC RX inject: ARP op=%u %u.%u.%u.%u -> %u.%u.%u.%u\n",
+        (unsigned)lwip_ntohs(arp->opcode), ip4_addr1(sip), ip4_addr2(sip),
+        ip4_addr3(sip), ip4_addr4(sip), ip4_addr1(dip), ip4_addr2(dip),
+        ip4_addr3(dip), ip4_addr4(dip));
+    return;
+  }
+
+  if (ethertype != ETHTYPE_IP) {
+    return;
+  }
+
+  if (len < (ETH_HDR_LEN + IP_HLEN)) {
+    tpmesh_debug_printf("TPMesh DDC RX inject: IPv4 short frame len=%u\n",
+                        (unsigned)len);
+    return;
+  }
+
+  const uint8_t *ip = frame + ETH_HDR_LEN;
+  uint8_t version = (uint8_t)((ip[0] >> 4) & 0x0F);
+  uint8_t ihl = (uint8_t)((ip[0] & 0x0F) * 4U);
+  uint16_t ip_tot_len = (uint16_t)(((uint16_t)ip[2] << 8) | ip[3]);
+  uint8_t proto = ip[9];
+  const uint8_t *src_ip = ip + 12;
+  const uint8_t *dst_ip = ip + 16;
+
+  tpmesh_debug_printf(
+      "TPMesh DDC RX inject: IPv4 ver=%u ihl=%u tot=%u proto=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
+      (unsigned)version, (unsigned)ihl, (unsigned)ip_tot_len, (unsigned)proto,
+      src_ip[0], src_ip[1], src_ip[2], src_ip[3], dst_ip[0], dst_ip[1],
+      dst_ip[2], dst_ip[3]);
+
+  if (version != 4 || ihl < IP_HLEN || proto != IP_PROTO_UDP ||
+      len < (uint16_t)(ETH_HDR_LEN + ihl + UDP_HLEN)) {
+    return;
+  }
+
+  const uint8_t *udp = ip + ihl;
+  uint16_t sport = (uint16_t)(((uint16_t)udp[0] << 8) | udp[1]);
+  uint16_t dport = (uint16_t)(((uint16_t)udp[2] << 8) | udp[3]);
+  uint16_t ulen = (uint16_t)(((uint16_t)udp[4] << 8) | udp[5]);
+  tpmesh_debug_printf("TPMesh DDC RX inject: UDP sport=%u dport=%u len=%u\n",
+                      (unsigned)sport, (unsigned)dport, (unsigned)ulen);
 }
 
 static int fragment_and_send(uint16_t dest_mesh_id, const uint8_t *data,
@@ -1414,6 +1492,7 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     /* DDC: 交给本地协议栈处理 */
     struct netif *ddc_netif = netif_default;
     if (ddc_netif && ddc_netif->input) {
+      trace_ddc_inject_frame(src_mesh_id, s_rebuild_eth_frame, eth_len);
       struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
       if (p) {
         memcpy(p->payload, s_rebuild_eth_frame, eth_len);
