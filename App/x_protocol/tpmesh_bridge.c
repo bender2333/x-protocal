@@ -1732,12 +1732,30 @@ static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
   SMEMCPY(&arp->dipaddr, &req_arp->sipaddr, sizeof(ip4_addr_t));
 
   /* 发送 */
-  s_eth_netif->linkoutput(s_eth_netif, p);
+  ip4_addr_t req_ip;
+  SMEMCPY(&req_ip, &req_arp->sipaddr, sizeof(ip4_addr_t));
+
+  err_t tx_err = s_eth_netif->linkoutput(s_eth_netif, p);
   pbuf_free(p);
 
-  tpmesh_debug_printf("TPMesh: Proxy ARP reply sent for %d.%d.%d.%d\n",
-                      ip4_addr1(target_ip), ip4_addr2(target_ip),
-                      ip4_addr3(target_ip), ip4_addr4(target_ip));
+  if (tx_err != ERR_OK) {
+    tpmesh_debug_printf(
+        "TPMesh: Proxy ARP reply send failed err=%d target=%d.%d.%d.%d requester=%d.%d.%d.%d dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+        (int)tx_err, ip4_addr1(target_ip), ip4_addr2(target_ip),
+        ip4_addr3(target_ip), ip4_addr4(target_ip), ip4_addr1(&req_ip),
+        ip4_addr2(&req_ip), ip4_addr3(&req_ip), ip4_addr4(&req_ip),
+        req_eth->src.addr[0], req_eth->src.addr[1], req_eth->src.addr[2],
+        req_eth->src.addr[3], req_eth->src.addr[4], req_eth->src.addr[5]);
+    return -3;
+  }
+
+  tpmesh_debug_printf(
+      "TPMesh: Proxy ARP reply sent target=%d.%d.%d.%d requester=%d.%d.%d.%d dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+      ip4_addr1(target_ip), ip4_addr2(target_ip), ip4_addr3(target_ip),
+      ip4_addr4(target_ip), ip4_addr1(&req_ip), ip4_addr2(&req_ip),
+      ip4_addr3(&req_ip), ip4_addr4(&req_ip), req_eth->src.addr[0],
+      req_eth->src.addr[1], req_eth->src.addr[2], req_eth->src.addr[3],
+      req_eth->src.addr[4], req_eth->src.addr[5]);
 
   return 0;
 }

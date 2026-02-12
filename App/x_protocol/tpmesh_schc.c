@@ -113,7 +113,7 @@ uint8_t schc_get_rule(const uint8_t *eth_frame, uint16_t eth_len) {
   const uint8_t *udp_hdr = ip_hdr + ihl;
   uint16_t src_port = read_be16(udp_hdr + 0);
   uint16_t dst_port = read_be16(udp_hdr + 2);
-  if (src_port == PORT_BACNET_IP || dst_port == PORT_BACNET_IP) {
+  if (src_port == PORT_BACNET_IP && dst_port == PORT_BACNET_IP) {
     return SCHC_RULE_BACNET_IP;
   }
   return SCHC_RULE_IP_ONLY;
