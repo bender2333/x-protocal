@@ -1589,6 +1589,7 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     struct netif *ddc_netif = netif_default;
     if (ddc_netif && ddc_netif->input) {
       ddc_fix_bacnet_dst_ip(s_rebuild_eth_frame, eth_len);
+      trace_ddc_inject_frame(src_mesh_id, s_rebuild_eth_frame, eth_len);
       struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
       if (p) {
         memcpy(p->payload, s_rebuild_eth_frame, eth_len);
