@@ -33,11 +33,18 @@
 
 ### 2.2 Edge/DDC 节点（`TPMESH_MODE_DDC`）
 
-- 外部面：不发送 PHY ETH（业务数据走 Mesh）。
-- 内部面：复用本地 LwIP `netif`；通过 hook `netif->linkoutput` 把 TX 导向 Mesh。
+- 外部面：保留 PHY ETH（管理面/MQTT/本地服务仍走以太网）。
+- 内部面：复用本地 LwIP `netif`；`linkoutput` 采用选择性 hook：
+  - Mesh 业务流量 -> Mesh。
+  - 非 Mesh 业务流量 -> 回落 PHY 原始发送路径。
 - 角色职责：
   - 发现 Top 路由后发注册，在线后发心跳。
-  - 本地协议栈 TX -> Mesh；Mesh RX -> 注入本地协议栈 `netif->input`。
+  - 本地协议栈 TX ->（Mesh 或 PHY）；Mesh RX -> 注入本地协议栈 `netif->input`。
+
+### 2.3 运行状态（Runtime State）
+
+- `RUN`：Top/Edge Mesh 数据面开启。
+- `CONFIG`：Mesh 数据面停用并释放 UART6 给配置线程；PHY 本地协议栈保持可用（用于 MQTT 配置链路）。
 
 ## 3. 模块分层与职责
 
@@ -81,16 +88,16 @@
 
 ### 5.2 Top 入站（ETH -> Mesh）
 
-入口：`ethernetif_input()` -> `tpmesh_eth_input_hook()` -> `tpmesh_bridge_check()`。
+入口：`ethernetif_input()` 先本地 `netif->input`，再镜像副本到 `tpmesh_eth_input_hook()`。
 
 策略动作：
 
-- `BRIDGE_LOCAL`：交给 `netif->input`。
-- `BRIDGE_TO_MESH`：走 `tpmesh_bridge_forward_to_mesh()`。
+- `BRIDGE_LOCAL`：不转发 Mesh（本地栈已先处理）。
+- `BRIDGE_TO_MESH`：走 `tpmesh_bridge_forward_to_mesh()`（镜像转发，不阻断本地）。
 - `BRIDGE_PROXY_ARP`：走 `tpmesh_bridge_send_proxy_arp()`。
-- `BRIDGE_DROP`：直接消费。
+- `BRIDGE_DROP`：仅丢弃镜像方向，不影响本地栈。
 
-注意：桥接动作采用 fail-closed；一旦判定为 bridge-owned，不回落本地协议栈。
+注意：Top 入站采用 local-first tap 模式，避免新增本地业务被桥接策略误拦截。
 
 ### 5.3 Top 入站（Mesh -> ETH）
 
@@ -102,8 +109,9 @@
 ### 5.4 Edge 出站（本地协议栈 -> Mesh）
 
 1. Edge 初始化时调用 `tpmesh_bridge_attach_ddc_netif(netif_default)`。
-2. LwIP TX 经 `netif->linkoutput` 被 hook 到 bridge。
-3. bridge 封装 tunnel + 分片后通过 `AT+SEND` 发给 Top。
+2. LwIP TX 经 `netif->linkoutput` 进入选择性 hook。
+3. 命中 Mesh 业务规则（如 BACnet UDP / node ARP）时，bridge 封装 tunnel + 分片后通过 `AT+SEND` 发给 Top。
+4. 未命中 Mesh 规则时，回落到 PHY 原始 `linkoutput`（保障 MQTT/管理流量）。
 
 ### 5.5 Edge 入站（Mesh -> 本地协议栈）
 
@@ -123,10 +131,11 @@
 #### 5.6.2 BMS Who-Is 广播 -> DDC I-Am 广播
 
 1. BMS 发送 BACnet Who-Is 广播帧。
-2. Top 判定广播可转发并执行限速。
-3. Top 压缩封装后广播到 Mesh。
-4. DDC 解压后本地 BACnet 栈收到 Who-Is 并产生 I-Am 广播。
-5. DDC 将 I-Am 通过 Mesh 回传 Top，Top 解压并从物理网卡广播发出。
+2. Top 本地协议栈先收到 Who-Is，可按需直接响应。
+3. Top 判定广播可转发并执行限速。
+4. Top 压缩封装后广播到 Mesh。
+5. DDC 解压后本地 BACnet 栈收到 Who-Is 并产生 I-Am 广播。
+6. DDC 将 I-Am 通过 Mesh 回传 Top，Top 解压并从物理网卡广播发出。
 
 #### 5.6.3 ARP 代理流程（BMS 发现 DDC）
 
@@ -203,11 +212,12 @@
 
 采用“单向接管 + 重启边界”模型：
 
-1. 调用 `tpmesh_request_uart6_takeover()`。
-2. 接口在 busy 场景下可阻塞，直到 UART6 安全释放。
-3. 外部配置工具接管 UART6 进行配置。
-4. 终止当前模块/进程并重启。
-5. x_protocol 按正常启动路径重新初始化。
+1. 运行时切换到 `CONFIG`（`tpmesh_set_run_state(TPMESH_RUN_STATE_CONFIG)`）。
+2. 调用 `tpmesh_request_uart6_takeover()`。
+3. 接口在 busy 场景下可阻塞，直到 UART6 安全释放。
+4. 外部配置工具接管 UART6 进行配置（PHY/MQTT 通道保持可用）。
+5. 终止当前模块/进程并重启。
+6. x_protocol 按正常启动路径重新初始化并进入 `RUN`。
 
 ### 7.2 明确约束
 
@@ -237,6 +247,11 @@
 - `int tpmesh_module_init_ddc(void)`
 - `void tpmesh_create_tasks(void)`
 - `bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p)`
+- `tpmesh_role_t tpmesh_get_role(void)`
+- `tpmesh_run_state_t tpmesh_get_run_state(void)`
+- `int tpmesh_set_run_state(tpmesh_run_state_t state)`
+- `bool tpmesh_data_plane_enabled(void)`
+- `bool tpmesh_eth_input_tap_enabled(void)`
 - `bool tpmesh_is_initialized(void)`
 - `int tpmesh_request_uart6_takeover(void)`
 - `void tpmesh_print_status(void)`
@@ -280,7 +295,7 @@ UART API（`tpmesh_uart.h`）：
 ## 11. 集成步骤（最小闭环）
 
 1. 确认 `main.c` 调用顺序：`EnetInit` -> `tpmesh_module_init_xxx` -> `tpmesh_create_tasks`。
-2. 确认 `ethernetif_input` 调用 `tpmesh_eth_input_hook`。
+2. 确认 `ethernetif_input` 为 local-first，并在本地入栈后镜像调用 `tpmesh_eth_input_hook`。
 3. 设置 `TPMESH_MODE`（Top/Edge）。
 4. 编译并观察启动日志。
 5. 进行注册、心跳、ARP、UDP 双向验证。
@@ -327,3 +342,4 @@ UART API（`tpmesh_uart.h`）：
 | V0.8.1 | 2026-02-08 | SCHC 边界检查、IHL 回退、hook fail-closed |
 | V0.8.2 | 2026-02-08 | 分片契约统一、Top/Edge 数据流闭环修复 |
 | V0.8.3 | 2026-02-08 | UART6 收敛为单向接管 + 重启模型 |
+| V0.9 | 2026-02-12 | 引入 role+run_state 运行时模型；Top 入站改 local-first tap；Edge 出站改选择性 Mesh + PHY fallback |

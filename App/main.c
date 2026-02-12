@@ -91,12 +91,10 @@ void main_task(void) {
     ConfigObj();
     ModbusUSBSerialObj();
 
-#if (TPMESH_MODE != TPMESH_MODE_DDC)
     while (enet_rxframe_size_get() > 1) {
       lwip_frame_recv();
       WatchDogToggle();
     }
-#endif
 
     WatchDogToggle();
     CommMonObj();

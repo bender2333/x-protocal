@@ -300,17 +300,30 @@ void ethernetif_input(void *pvParameters)
     SYS_ARCH_UNPROTECT(sr);
 
     if (p != NULL) {
-        /* TPMesh 桥接钩子: 检查是否需要转发到 Mesh */
-        if (tpmesh_eth_input_hook(low_netif, p)) {
-            /* 帧已被 TPMesh 处理 (转发到 Mesh 或代理 ARP) */
-            pbuf_free(p);
-            return;
+        struct pbuf *tap_copy = NULL;
+
+#if (TPMESH_MODE != TPMESH_MODE_DISABLED)
+        if (tpmesh_eth_input_tap_enabled()) {
+            tap_copy = pbuf_alloc(PBUF_RAW, p->tot_len, PBUF_RAM);
+            if ((tap_copy != NULL) &&
+                (pbuf_copy_partial(p, tap_copy->payload, p->tot_len, 0) != p->tot_len)) {
+                pbuf_free(tap_copy);
+                tap_copy = NULL;
+            }
         }
-        
-        /* 交给 LwIP 本地处理 */
+#endif
+
+        /* local stack first: do not block local services */
         if (ERR_OK != low_netif->input(p, low_netif)) {
             pbuf_free(p);
         }
+
+#if (TPMESH_MODE != TPMESH_MODE_DISABLED)
+        if (tap_copy != NULL) {
+            (void)tpmesh_eth_input_hook(low_netif, tap_copy);
+            pbuf_free(tap_copy);
+        }
+#endif
     }
 }
 

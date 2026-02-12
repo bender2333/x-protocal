@@ -12,6 +12,7 @@
 #include "tpmesh_bridge.h"
 #include "tpmesh_at.h"
 #include "tpmesh_debug.h"
+#include "tpmesh_init.h"
 #include "tpmesh_schc.h"
 
 /* node_table.h 已通过 tpmesh_bridge.h 包含 */
@@ -61,6 +62,7 @@ typedef struct {
 /** 以太网 netif */
 static struct netif *s_eth_netif = NULL;
 static struct netif *s_ddc_netif = NULL;
+static netif_linkoutput_fn s_ddc_phy_linkoutput = NULL;
 
 /** Top Node 配置 */
 static top_config_t s_top_config;
@@ -303,7 +305,8 @@ bridge_action_t tpmesh_bridge_check(struct pbuf *p) {
 }
 
 int tpmesh_bridge_forward_to_mesh(struct pbuf *p) {
-  if (!s_initialized || p == NULL || p->tot_len < SIZEOF_ETH_HDR) {
+  if (!s_initialized || !tpmesh_data_plane_enabled() || p == NULL ||
+      p->tot_len < SIZEOF_ETH_HDR) {
     return -1;
   }
   if (!tpmesh_at_is_uart6_active()) {
@@ -377,6 +380,9 @@ int tpmesh_bridge_attach_ddc_netif(struct netif *netif) {
     return 0;
   }
 
+  if (netif->linkoutput != ddc_netif_linkoutput_hook) {
+    s_ddc_phy_linkoutput = netif->linkoutput;
+  }
   s_ddc_netif = netif;
   netif->linkoutput = ddc_netif_linkoutput_hook;
   tpmesh_debug_printf("TPMesh DDC: netif linkoutput hooked to Mesh bridge\n");
@@ -425,7 +431,8 @@ out:
 
 void tpmesh_bridge_handle_mesh_data(uint16_t src_mesh_id, const uint8_t *data,
                                     uint16_t len) {
-  if (!s_initialized || data == NULL || len == 0) {
+  if (!s_initialized || !tpmesh_data_plane_enabled() || data == NULL ||
+      len == 0) {
     return;
   }
 
@@ -1530,6 +1537,14 @@ static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
     return ERR_IF;
   }
 
+  if (!ddc_should_forward_to_mesh(p)) {
+    return s_ddc_phy_linkoutput ? s_ddc_phy_linkoutput(netif, p) : ERR_IF;
+  }
+
+  if (!tpmesh_data_plane_enabled() || !tpmesh_at_is_uart6_active()) {
+    return ERR_IF;
+  }
+
   if (s_ddc_state != DDC_STATE_ONLINE) {
     uint32_t now = tpmesh_get_tick_ms();
     if ((s_last_ddc_preonline_drop_log_tick == 0) ||
@@ -1542,10 +1557,7 @@ static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
     return ERR_IF;
   }
 
-  return ddc_should_forward_to_mesh(p) &&
-                 (tpmesh_bridge_forward_to_mesh(p) == 0)
-             ? ERR_OK
-             : ERR_IF;
+  return (tpmesh_bridge_forward_to_mesh(p) == 0) ? ERR_OK : ERR_IF;
 }
 
 static bridge_action_t check_arp_request(struct pbuf *p) {

@@ -39,6 +39,17 @@ extern "C" {
 #define TPMESH_MODE_TOP_NODE 1
 #define TPMESH_MODE_DDC 2
 
+typedef enum {
+  TPMESH_ROLE_NODE = 0,
+  TPMESH_ROLE_TOP = 1,
+  TPMESH_ROLE_EDGE = 2,
+} tpmesh_role_t;
+
+typedef enum {
+  TPMESH_RUN_STATE_RUN = 0,
+  TPMESH_RUN_STATE_CONFIG = 1,
+} tpmesh_run_state_t;
+
 /* 兼容旧宏 */
 #if defined(TPMESH_IS_TOP_NODE) && !defined(TPMESH_MODE)
 #if TPMESH_IS_TOP_NODE
@@ -126,6 +137,11 @@ void tpmesh_create_tasks(void);
  * @return true=已处理(桥接),false=交给 LwIP
  */
 bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p);
+tpmesh_role_t tpmesh_get_role(void);
+tpmesh_run_state_t tpmesh_get_run_state(void);
+int tpmesh_set_run_state(tpmesh_run_state_t state);
+bool tpmesh_data_plane_enabled(void);
+bool tpmesh_eth_input_tap_enabled(void);
 
 /**
  * @brief 获取 TPMesh 桥接状态

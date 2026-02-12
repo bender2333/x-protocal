@@ -35,6 +35,8 @@ static bool s_tpmesh_initialized = false;
 
 /** 是否为 Top Node */
 static bool s_is_top_node = false;
+static tpmesh_role_t s_role = TPMESH_ROLE_NODE;
+static tpmesh_run_state_t s_run_state = TPMESH_RUN_STATE_RUN;
 
 /** 任务句柄 */
 static TaskHandle_t s_at_rx_task_handle = NULL;
@@ -42,6 +44,28 @@ static TaskHandle_t s_bridge_task_handle = NULL;
 static TaskHandle_t s_heartbeat_task_handle = NULL;
 
 #define TPMESH_UART6_TAKEOVER_WAIT_MS 20
+
+static const char *tpmesh_role_to_str(tpmesh_role_t role) {
+  switch (role) {
+  case TPMESH_ROLE_TOP:
+    return "Top";
+  case TPMESH_ROLE_EDGE:
+    return "Edge";
+  case TPMESH_ROLE_NODE:
+  default:
+    return "Node";
+  }
+}
+
+static const char *tpmesh_state_to_str(tpmesh_run_state_t state) {
+  switch (state) {
+  case TPMESH_RUN_STATE_CONFIG:
+    return "Config";
+  case TPMESH_RUN_STATE_RUN:
+  default:
+    return "Run";
+  }
+}
 
 /* ============================================================================
  * 公共函数
@@ -85,6 +109,8 @@ int tpmesh_module_init_top(struct netif *eth_netif) {
   }
 
   s_is_top_node = true;
+  s_role = TPMESH_ROLE_TOP;
+  s_run_state = TPMESH_RUN_STATE_RUN;
   s_tpmesh_initialized = true;
 
   tpmesh_debug_printf(
@@ -180,6 +206,8 @@ int tpmesh_module_init_ddc(void) {
   }
 
   s_is_top_node = false;
+  s_role = TPMESH_ROLE_EDGE;
+  s_run_state = TPMESH_RUN_STATE_RUN;
   s_tpmesh_initialized = true;
 
   tpmesh_debug_printf(
@@ -214,10 +242,7 @@ void tpmesh_create_tasks(void) {
 bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
   (void)netif;
 
-  if (!s_tpmesh_initialized || !s_is_top_node) {
-    return false;
-  }
-  if (!tpmesh_at_is_uart6_active()) {
+  if (!tpmesh_eth_input_tap_enabled()) {
     return false;
   }
 
@@ -251,6 +276,41 @@ bool tpmesh_eth_input_hook(struct netif *netif, struct pbuf *p) {
   }
 }
 
+tpmesh_role_t tpmesh_get_role(void) { return s_role; }
+
+tpmesh_run_state_t tpmesh_get_run_state(void) { return s_run_state; }
+
+bool tpmesh_data_plane_enabled(void) {
+  return s_tpmesh_initialized && (s_run_state == TPMESH_RUN_STATE_RUN) &&
+         (s_role != TPMESH_ROLE_NODE);
+}
+
+bool tpmesh_eth_input_tap_enabled(void) {
+  return tpmesh_data_plane_enabled() && (s_role == TPMESH_ROLE_TOP) &&
+         tpmesh_at_is_uart6_active();
+}
+
+int tpmesh_set_run_state(tpmesh_run_state_t state) {
+  if (state != TPMESH_RUN_STATE_RUN && state != TPMESH_RUN_STATE_CONFIG) {
+    return -2;
+  }
+  if (state == s_run_state) {
+    return 0;
+  }
+
+  if (state == TPMESH_RUN_STATE_CONFIG && s_tpmesh_initialized) {
+    int ret = tpmesh_request_uart6_takeover();
+    if (ret != 0) {
+      return ret;
+    }
+  }
+
+  s_run_state = state;
+  tpmesh_debug_printf("TPMesh: runtime state -> %s\n",
+                      tpmesh_state_to_str(s_run_state));
+  return 0;
+}
+
 bool tpmesh_is_initialized(void) { return s_tpmesh_initialized; }
 
 int tpmesh_request_uart6_takeover(void) {
@@ -278,7 +338,8 @@ int tpmesh_request_uart6_takeover(void) {
 void tpmesh_print_status(void) {
   tpmesh_debug_printf("\n=== TPMesh Status ===\n");
   tpmesh_debug_printf("Initialized: %s\n", s_tpmesh_initialized ? "Yes" : "No");
-  tpmesh_debug_printf("Mode: %s\n", s_is_top_node ? "Top Node" : "DDC");
+  tpmesh_debug_printf("Role: %s\n", tpmesh_role_to_str(s_role));
+  tpmesh_debug_printf("State: %s\n", tpmesh_state_to_str(s_run_state));
   tpmesh_debug_printf("UART6 active: %s\n",
                       tpmesh_at_is_uart6_active() ? "Yes" : "No");
 

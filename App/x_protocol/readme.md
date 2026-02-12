@@ -21,12 +21,12 @@
 
 ### 2.2 Top 入站分流（ETH -> Mesh/Local）
 
-- 入口：`ethernetif_input()` -> `tpmesh_eth_input_hook()` -> `tpmesh_bridge_check()`。
+- 入口：`ethernetif_input()` local-first 入栈后，再镜像到 `tpmesh_eth_input_hook()`。
 - 动作：
-  - `BRIDGE_LOCAL`：交给本地 `netif->input`。
-  - `BRIDGE_TO_MESH`：封装/压缩后发 Mesh。
+  - `BRIDGE_LOCAL`：仅本地处理。
+  - `BRIDGE_TO_MESH`：镜像副本封装/压缩后发 Mesh。
   - `BRIDGE_PROXY_ARP`：Top 代答 ARP。
-  - `BRIDGE_DROP`：消费丢弃。
+  - `BRIDGE_DROP`：仅镜像方向丢弃，不影响本地栈。
 
 ### 2.3 Top 下行（Mesh -> ETH）
 
@@ -37,7 +37,13 @@
 ### 2.4 Edge 出站（LwIP -> Mesh）
 
 1. Edge 初始化时 hook `netif->linkoutput` 到 bridge。
-2. 本地协议栈发出的帧通过 bridge 封装后经 `AT+SEND` 发往 Top。
+2. 命中 Mesh 业务规则的帧通过 bridge 封装后经 `AT+SEND` 发往 Top。
+3. 非 Mesh 业务（如 MQTT/管理流量）回落原始 PHY `linkoutput`。
+
+### 2.6 运行状态（RUN/CONFIG）
+
+1. `RUN`：Mesh 数据面开启。
+2. `CONFIG`：Mesh 数据面停用并释放 UART6；PHY/MQTT 保持在线。
 
 ### 2.5 ARP 代理流程
 
@@ -114,6 +120,7 @@
 | V0.8.1 | 2026-02-08 | SCHC 边界检查、IHL 回退、hook fail-closed |
 | V0.8.2 | 2026-02-08 | 分片契约统一、Top/Edge 数据流闭环修复 |
 | V0.8.3 | 2026-02-08 | UART6 收敛为单向接管 + 重启模型 |
+| V0.9 | 2026-02-12 | role+run_state；Top local-first tap；Edge 选择性 Mesh + PHY fallback |
 
 ## 6. 完整文档入口
 
