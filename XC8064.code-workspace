@@ -128,7 +128,7 @@
             "mem.h": "c",
             "tpmesh_at.h": "c"
         },
-        "cortex-debug.variableUseNaturalFormat": false,
+        "cortex-debug.variableUseNaturalFormat": true,
         "EIDE.ARM.GCC.InstallDirectory": "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.2 rel1",
         "EIDE.ARM.GCC.Prefix": "arm-none-eabi-"
     }

@@ -300,15 +300,32 @@ at_resp_t tpmesh_at_send_data(uint16_t dest_mesh_id, const uint8_t *data,
 
   /* 构建 "AT+SEND=XXXX,LEN,HEXDATA,TYPE\r\n" */
   char cmd[TPMESH_AT_CMD_MAX_LEN];
-  char hex_data[TPMESH_MTU * 2 + 1];
-  bytes_to_hex(data, len, hex_data);
-
-  int cmd_len = snprintf(cmd, sizeof(cmd), "AT+SEND=%04X,%u,%s,%u\r\n",
-                         dest_mesh_id, (unsigned)len, hex_data,
-                         (unsigned)TPMESH_AT_SEND_TYPE_DEFAULT);
+  int cmd_len = snprintf(cmd, sizeof(cmd), "AT+SEND=%04X,%u,", dest_mesh_id,
+                         (unsigned)len);
   if (cmd_len <= 0 || cmd_len >= (int)sizeof(cmd)) {
     return AT_RESP_ERROR;
   }
+
+  static const char hex_chars[] = "0123456789ABCDEF";
+  size_t used = (size_t)cmd_len;
+  size_t hex_need = (size_t)len * 2U;
+  size_t tail_need = 4U; /* ",<type>\r\n" where type is 0-9 */
+  if (used + hex_need + tail_need >= sizeof(cmd)) {
+    return AT_RESP_ERROR;
+  }
+
+  for (uint16_t i = 0; i < len; i++) {
+    uint8_t b = data[i];
+    cmd[used++] = hex_chars[(b >> 4) & 0x0F];
+    cmd[used++] = hex_chars[b & 0x0F];
+  }
+
+  int tail_len = snprintf(cmd + used, sizeof(cmd) - used, ",%u\r\n",
+                          (unsigned)TPMESH_AT_SEND_TYPE_DEFAULT);
+  if (tail_len <= 0 || (size_t)tail_len >= (sizeof(cmd) - used)) {
+    return AT_RESP_ERROR;
+  }
+  cmd_len = (int)(used + (size_t)tail_len);
 
   return send_and_wait((uint8_t *)cmd, (uint16_t)cmd_len, TPMESH_AT_TIMEOUT_MS);
 }
@@ -362,7 +379,7 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
   }
 
   /* 设置 Cell ID */
-  r = tpmesh_at_cmd("AT+CELL=0", TPMESH_AT_TIMEOUT_MS);
+  r = tpmesh_at_cmd("AT+CELL=254", TPMESH_AT_TIMEOUT_MS);
   if (r != AT_RESP_OK) {
     tpmesh_debug_printf("Module: CELL failed\n");
     return -3;
@@ -370,7 +387,8 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
 
   /* 设置功耗模式 (Top=TypeD 常接收, DDC=TypeC 低功耗) */
   {
-    uint8_t lp = is_top_node ? TPMESH_AT_LP_TOP_DEFAULT : TPMESH_AT_LP_DDC_DEFAULT;
+    uint8_t lp =
+        is_top_node ? TPMESH_AT_LP_TOP_DEFAULT : TPMESH_AT_LP_DDC_DEFAULT;
     snprintf(cmd, sizeof(cmd), "AT+LP=%u", (unsigned)lp);
   }
   r = tpmesh_at_cmd(cmd, TPMESH_AT_TIMEOUT_MS);
@@ -378,7 +396,7 @@ int tpmesh_module_init(uint16_t mesh_id, bool is_top_node) {
     tpmesh_debug_printf("Module: LP failed\n");
     return -4;
   }
-
+  tpmesh_module_reset();
   tpmesh_debug_printf("Module: Init OK\n");
   return 0;
 }
@@ -396,8 +414,22 @@ void tpmesh_module_reset(void) {
 void tpmesh_at_rx_task(void *arg) {
   (void)arg;
   tpmesh_debug_printf("AT RX Task: started\n");
+  TickType_t last_stack_log_tick = 0;
 
   while (1) {
+#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
+    TickType_t now_tick = xTaskGetTickCount();
+    if ((last_stack_log_tick == 0) ||
+        ((now_tick - last_stack_log_tick) >= pdMS_TO_TICKS(5000))) {
+      last_stack_log_tick = now_tick;
+      UBaseType_t free_words = uxTaskGetStackHighWaterMark(NULL);
+      tpmesh_debug_printf(
+          "TPMesh Stack: task=AT_RX free=%lu words (%lu bytes)\n",
+          (unsigned long)free_words,
+          (unsigned long)(free_words * sizeof(StackType_t)));
+    }
+#endif
+
     if (!s_uart6_active) {
       vTaskDelay(pdMS_TO_TICKS(20));
       continue;
@@ -420,7 +452,8 @@ int tpmesh_at_parse_nnmi(const char *urc, uint16_t *src_mesh_id, uint8_t *data,
   }
 
   const char *p = urc + 6;
-  while (*p == ' ') p++;
+  while (*p == ' ')
+    p++;
 
   char *endptr = NULL;
   unsigned long src = strtoul(p, &endptr, 16);
@@ -429,26 +462,30 @@ int tpmesh_at_parse_nnmi(const char *urc, uint16_t *src_mesh_id, uint8_t *data,
   }
   *src_mesh_id = (uint16_t)src;
   p = endptr + 1;
-  while (*p == ' ') p++;
+  while (*p == ' ')
+    p++;
 
   /* 尝试新格式: DEST,RSSI,LEN,DATA */
   unsigned long dest = strtoul(p, &endptr, 16);
   (void)dest;
   if (endptr != p && *endptr == ',') {
     p = endptr + 1;
-    while (*p == ' ') p++;
+    while (*p == ' ')
+      p++;
 
     (void)strtol(p, &endptr, 10); /* RSSI */
     if (endptr != p && *endptr == ',') {
       p = endptr + 1;
-      while (*p == ' ') p++;
+      while (*p == ' ')
+        p++;
 
       unsigned long declared_len = strtoul(p, &endptr, 10);
       if (endptr == p || *endptr != ',') {
         return -3;
       }
       p = endptr + 1;
-      while (*p == ' ') p++;
+      while (*p == ' ')
+        p++;
 
       if (declared_len > TPMESH_MTU || declared_len > *len) {
         return -4;
@@ -469,7 +506,8 @@ int tpmesh_at_parse_nnmi(const char *urc, uint16_t *src_mesh_id, uint8_t *data,
     return -6;
   }
   p = endptr + 1;
-  while (*p == ' ') p++;
+  while (*p == ' ')
+    p++;
 
   if (declared_len > TPMESH_MTU || declared_len > *len) {
     return -7;
@@ -565,7 +603,8 @@ static void dispatch_line(const char *line) {
   /* ---- +ROUTE: 路由 URC ---- */
   if (strncmp(line, "+ROUTE:", 7) == 0) {
     const char *p = line + 7; /* 指向 "CREATE ADDR[0xFFFE]" 的开头 */
-    while (*p == ' ') p++;    /* 兼容 "+ROUTE: CREATE ..." */
+    while (*p == ' ')
+      p++; /* 兼容 "+ROUTE: CREATE ..." */
 
     /* 1. 增大缓冲区，防止越界 (25字节对于包含地址的完整长串可能比较紧凑) */
     char event[64] = {0};

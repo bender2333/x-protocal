@@ -271,6 +271,7 @@ void start_app(void) {
 int main(void) {
   WatchDogInit();
   WatchDogToggle();
+  tpmesh_debug_init();
   start_app();
   DISABLE_INTERRUPT();
   TimerInit();
@@ -290,7 +291,6 @@ int main(void) {
   CommMonInit();
 
   /* 初始化调试输出 (printf -> USART2) */
-  tpmesh_debug_init();
 
   WatchDogToggle();
   EnetInit(false);

@@ -35,6 +35,8 @@
 
 /** 初始化状态 */
 static volatile int s_initialized = 0;
+/** printf 格式化缓冲（避免在小栈任务中使用大局部数组） */
+static char s_printf_buf[256];
 
 /* ============================================================================
  * 轮询发送 (简单可靠)
@@ -134,24 +136,23 @@ void tpmesh_debug_puts(const char *str)
 
 int tpmesh_debug_printf(const char *fmt, ...)
 {
-    if (!s_initialized) {
+    if (!s_initialized || fmt == NULL) {
         return 0;
     }
 
-    char buf[256];
     va_list args;
     
     va_start(args, fmt);
-    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    int len = vsnprintf(s_printf_buf, sizeof(s_printf_buf), fmt, args);
     va_end(args);
 
     if (len > 0) {
         int out_len = len;
-        if (out_len >= (int)sizeof(buf)) {
-            out_len = (int)sizeof(buf) - 1;
+        if (out_len >= (int)sizeof(s_printf_buf)) {
+            out_len = (int)sizeof(s_printf_buf) - 1;
         }
         for (int i = 0; i < out_len; i++) {
-            tpmesh_debug_putc(buf[i]);
+            tpmesh_debug_putc(s_printf_buf[i]);
         }
     }
 

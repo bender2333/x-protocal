@@ -41,7 +41,8 @@ static inline bool mac_equal(const uint8_t *a, const uint8_t *b)
  */
 static inline uint32_t get_tick_ms(void)
 {
-    return xTaskGetTickCount() * portTICK_PERIOD_MS;
+    TickType_t ticks = xTaskGetTickCount();
+    return (uint32_t)(((uint64_t)ticks * 1000ULL) / (uint64_t)configTICK_RATE_HZ);
 }
 
 /**
@@ -441,9 +442,11 @@ void node_table_check_timeout(void)
 
         uint32_t elapsed = now - s_node_table[i].last_seen;
         if (elapsed > NODE_TABLE_TIMEOUT_MS) {
-            tpmesh_debug_printf("NodeTable: Node 0x%04X offline (timeout)\n", 
-                   s_node_table[i].mesh_id);
-            s_node_table[i].online = 0;
+            if (s_node_table[i].online) {
+                tpmesh_debug_printf("NodeTable: Node 0x%04X offline (timeout)\n",
+                       s_node_table[i].mesh_id);
+                s_node_table[i].online = 0;
+            }
             
             /* 可选: 完全删除 */
             /* s_node_table[i].valid = 0; */

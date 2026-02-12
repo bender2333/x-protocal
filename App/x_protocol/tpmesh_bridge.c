@@ -95,6 +95,7 @@ static volatile uint8_t s_heartbeat_miss_count = 0;
 /** 当前是否等待心跳 ACK */
 static volatile bool s_waiting_heartbeat_ack = false;
 static volatile uint32_t s_last_ddc_preonline_drop_log_tick = 0;
+static volatile uint32_t s_last_self_loop_drop_log_tick = 0;
 
 /** 广播限速器 */
 static rate_limiter_t s_rate_limiter = {0, 0};
@@ -105,6 +106,8 @@ static reassembly_session_t s_reassembly_sessions[MAX_REASSEMBLY_SESSIONS];
 
 /** DDC 重组会话 (单个) */
 static reassembly_session_t s_ddc_reassembly;
+/* Reuse in bridge task only; avoids large stack frame in process_data_frame(). */
+static uint8_t s_rebuild_eth_frame[1600];
 
 /** Mesh 消息队列 */
 static QueueHandle_t s_mesh_msg_queue = NULL;
@@ -151,6 +154,9 @@ static void trace_tunnel_packet_summary(const char *source, const uint8_t *data,
                                         uint16_t len);
 static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
                               const uint8_t *data, uint16_t len);
+static uint16_t ip_checksum16(const uint8_t *buf, uint16_t len);
+static void top_fix_bacnet_src_ip(uint16_t src_mesh_id, uint8_t *eth_frame,
+                                  uint16_t eth_len);
 
 /* ============================================================================
  * 公共函数 - 初始化
@@ -423,6 +429,17 @@ void tpmesh_bridge_handle_mesh_data(uint16_t src_mesh_id, const uint8_t *data,
     return;
   }
 
+  /* Top node may receive its own broadcast echo from module; ignore it. */
+  if (s_is_top_node && src_mesh_id == s_top_config.mesh_id) {
+    uint32_t now = tpmesh_get_tick_ms();
+    if (now - s_last_self_loop_drop_log_tick > 1000) {
+      s_last_self_loop_drop_log_tick = now;
+      tpmesh_debug_printf("TPMesh: drop self-loop mesh frame src=0x%04X len=%u\n",
+                          src_mesh_id, len);
+    }
+    return;
+  }
+
   if (len < TPMESH_TUNNEL_HDR_LEN) {
     tpmesh_debug_printf("TPMesh: Drop short mesh frame len=%u\n", len);
     return;
@@ -443,6 +460,7 @@ void tpmesh_bridge_task(void *arg) {
   (void)arg;
 
   tpmesh_debug_printf("Bridge Task: started\n");
+  TickType_t last_stack_log_tick = 0;
 
   /* ================================================================
    * Phase 1: 业务初始化 (调度器已启动, RX Task 已运行)
@@ -488,6 +506,19 @@ void tpmesh_bridge_task(void *arg) {
   mesh_msg_t msg;
 
   while (1) {
+#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
+    TickType_t now_tick = xTaskGetTickCount();
+    if ((last_stack_log_tick == 0) ||
+        ((now_tick - last_stack_log_tick) >= pdMS_TO_TICKS(5000))) {
+      last_stack_log_tick = now_tick;
+      UBaseType_t free_words = uxTaskGetStackHighWaterMark(NULL);
+      tpmesh_debug_printf(
+          "TPMesh Stack: task=Bridge free=%lu words (%lu bytes)\n",
+          (unsigned long)free_words,
+          (unsigned long)(free_words * sizeof(StackType_t)));
+    }
+#endif
+
     /* 从队列获取消息 */
     if (xQueueReceive(s_mesh_msg_queue, &msg, pdMS_TO_TICKS(100)) == pdTRUE) {
       tpmesh_bridge_handle_mesh_data(msg.src_mesh_id, msg.data, msg.len);
@@ -550,8 +581,21 @@ int ddc_send_heartbeat(const ddc_config_t *config) {
 
 void ddc_heartbeat_task(void *arg) {
   (void)arg;
+  TickType_t last_stack_log_tick = 0;
 
   while (1) {
+#if (INCLUDE_uxTaskGetStackHighWaterMark == 1)
+    TickType_t now_tick = xTaskGetTickCount();
+    if ((last_stack_log_tick == 0) ||
+        ((now_tick - last_stack_log_tick) >= pdMS_TO_TICKS(5000))) {
+      last_stack_log_tick = now_tick;
+      UBaseType_t free_words = uxTaskGetStackHighWaterMark(NULL);
+      tpmesh_debug_printf("TPMesh Stack: task=HB free=%lu words (%lu bytes)\n",
+                          (unsigned long)free_words,
+                          (unsigned long)(free_words * sizeof(StackType_t)));
+    }
+#endif
+
     if (!tpmesh_at_is_uart6_active()) {
       vTaskDelay(pdMS_TO_TICKS(100));
       continue;
@@ -573,13 +617,14 @@ void ddc_heartbeat_task(void *arg) {
           if (ddc_send_register(&s_ddc_config) != 0) {
             tpmesh_debug_printf("TPMesh DDC: register send failed\n");
           } else {
-            tpmesh_debug_printf(
-                "TPMesh DDC: register sent, waiting ACK (try=%u/%u)\n",
-                (unsigned)(s_register_retry_count + 1),
-                (unsigned)TPMESH_REGISTER_MAX_RETRIES);
+            tpmesh_debug_printf("TPMesh DDC: register sent, current tick "
+                                "is:%x,  waiting ACK (try=%u/%u)\n",
+                                now, (unsigned)(s_register_retry_count + 1),
+                                (unsigned)TPMESH_REGISTER_MAX_RETRIES);
           }
           s_last_register_tick = now;
           s_register_retry_count++;
+
         } else {
           tpmesh_debug_printf("TPMesh DDC: Register timeout, reset module\n");
           tpmesh_module_reset();
@@ -659,7 +704,8 @@ bool broadcast_rate_check(void) {
  */
 
 uint32_t tpmesh_get_tick_ms(void) {
-  return xTaskGetTickCount() * portTICK_PERIOD_MS;
+  TickType_t ticks = xTaskGetTickCount();
+  return (uint32_t)(((uint64_t)ticks * 1000ULL) / (uint64_t)configTICK_RATE_HZ);
 }
 
 uint16_t tpmesh_calc_crc16(const void *data, uint16_t len) {
@@ -678,6 +724,80 @@ uint16_t tpmesh_calc_crc16(const void *data, uint16_t len) {
   }
 
   return crc;
+}
+
+static uint16_t ip_checksum16(const uint8_t *buf, uint16_t len) {
+  uint32_t sum = 0;
+  uint16_t i = 0;
+
+  while ((i + 1) < len) {
+    sum += (uint32_t)(((uint16_t)buf[i] << 8) | buf[i + 1]);
+    i += 2;
+  }
+  if (i < len) {
+    sum += (uint32_t)((uint16_t)buf[i] << 8);
+  }
+  while ((sum >> 16) != 0) {
+    sum = (sum & 0xFFFFU) + (sum >> 16);
+  }
+  return (uint16_t)(~sum);
+}
+
+static void top_fix_bacnet_src_ip(uint16_t src_mesh_id, uint8_t *eth_frame,
+                                  uint16_t eth_len) {
+  if (!s_is_top_node || src_mesh_id == s_top_config.mesh_id || eth_frame == NULL ||
+      eth_len < (ETH_HDR_LEN + IP_HLEN + UDP_HLEN)) {
+    return;
+  }
+
+  uint16_t ethertype = (uint16_t)(((uint16_t)eth_frame[12] << 8) | eth_frame[13]);
+  if (ethertype != ETHTYPE_IP) {
+    return;
+  }
+
+  uint8_t *ip = eth_frame + ETH_HDR_LEN;
+  uint8_t version = (uint8_t)((ip[0] >> 4) & 0x0F);
+  uint8_t ihl = (uint8_t)((ip[0] & 0x0F) * 4U);
+  if (version != 4 || ihl < IP_HLEN || ihl > IP_HLEN_MAX ||
+      eth_len < (ETH_HDR_LEN + ihl + UDP_HLEN) || ip[9] != IP_PROTO_UDP) {
+    return;
+  }
+
+  uint8_t *udp = ip + ihl;
+  uint16_t sport = (uint16_t)(((uint16_t)udp[0] << 8) | udp[1]);
+  uint16_t dport = (uint16_t)(((uint16_t)udp[2] << 8) | udp[3]);
+  if (sport != TPMESH_PORT_BACNET && dport != TPMESH_PORT_BACNET) {
+    return;
+  }
+
+  ip4_addr_t src_ip_expected;
+  if (node_table_get_ip_by_mesh(src_mesh_id, &src_ip_expected) != 0) {
+    return;
+  }
+
+  uint8_t expected[4] = {ip4_addr1(&src_ip_expected), ip4_addr2(&src_ip_expected),
+                         ip4_addr3(&src_ip_expected), ip4_addr4(&src_ip_expected)};
+  if (memcmp(ip + 12, expected, sizeof(expected)) == 0) {
+    return;
+  }
+
+  tpmesh_debug_printf(
+      "TPMesh: fix uplink src ip mesh=0x%04X %u.%u.%u.%u -> %u.%u.%u.%u\n",
+      src_mesh_id, ip[12], ip[13], ip[14], ip[15], expected[0], expected[1],
+      expected[2], expected[3]);
+
+  memcpy(ip + 12, expected, sizeof(expected));
+  ip[10] = 0;
+  ip[11] = 0;
+  {
+    uint16_t cksum = ip_checksum16(ip, ihl);
+    ip[10] = (uint8_t)(cksum >> 8);
+    ip[11] = (uint8_t)(cksum & 0xFF);
+  }
+
+  /* IPv4 UDP allows checksum=0. Clear stale checksum after source IP rewrite. */
+  udp[6] = 0;
+  udp[7] = 0;
 }
 
 bool tpmesh_is_broadcast_mac(const uint8_t *mac) {
@@ -743,6 +863,12 @@ static void route_event_callback(const char *event, uint16_t addr) {
 
   if (!s_is_top_node && strncmp(ev, "CREATE", 6) == 0 &&
       addr == MESH_ADDR_TOP_NODE) {
+    if (s_ddc_state != DDC_STATE_INIT) {
+      tpmesh_debug_printf(
+          "TPMesh DDC: ignore duplicate CREATE while state=%s\n",
+          ddc_state_to_str(s_ddc_state));
+      return;
+    }
     /* DDC 发现 Top Node,开始注册 */
     tpmesh_debug_printf("TPMesh DDC: Top Node discovered, start registering\n");
     s_ddc_state = DDC_STATE_REGISTERING;
@@ -1227,28 +1353,29 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
   node_table_touch(src_mesh_id);
 
   /* SCHC 解压 */
-  uint8_t eth_frame[1600];
   uint16_t eth_len;
 
   uint16_t dst_mesh_id =
       s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
 
-  if (schc_decompress(complete_data, complete_len, eth_frame,
-                      (uint16_t)sizeof(eth_frame), &eth_len, src_mesh_id,
+  if (schc_decompress(complete_data, complete_len, s_rebuild_eth_frame,
+                      (uint16_t)sizeof(s_rebuild_eth_frame), &eth_len, src_mesh_id,
                       dst_mesh_id) != 0) {
     tpmesh_debug_printf("TPMesh: Decompress failed\n");
     return;
   }
 
+  top_fix_bacnet_src_ip(src_mesh_id, s_rebuild_eth_frame, eth_len);
+
   if (s_is_top_node) {
     /* Top Node: 转发到以太网 */
     if (s_eth_netif && s_eth_netif->linkoutput) {
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
-      if (p) {
-        memcpy(p->payload, eth_frame, eth_len);
-        s_eth_netif->linkoutput(s_eth_netif, p);
-        pbuf_free(p);
-      }
+        struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
+        if (p) {
+          memcpy(p->payload, s_rebuild_eth_frame, eth_len);
+          s_eth_netif->linkoutput(s_eth_netif, p);
+          pbuf_free(p);
+        }
     }
   } else {
     /* DDC: 交给本地协议栈处理 */
@@ -1256,7 +1383,7 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     if (ddc_netif && ddc_netif->input) {
       struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
       if (p) {
-        memcpy(p->payload, eth_frame, eth_len);
+        memcpy(p->payload, s_rebuild_eth_frame, eth_len);
         if (ddc_netif->input(p, ddc_netif) != ERR_OK) {
           tpmesh_debug_printf(
               "TPMesh DDC: netif input failed len=%u src=0x%04X\n", eth_len,
@@ -1364,9 +1491,9 @@ static bool ddc_should_forward_to_mesh(struct pbuf *p) {
 
   if (ethertype == ETHTYPE_ARP &&
       frame->tot_len >= (SIZEOF_ETH_HDR + SIZEOF_ETHARP_HDR)) {
-    const struct etharp_hdr *arp = (const struct etharp_hdr
-                                        *)((const uint8_t *)frame->payload +
-                                           SIZEOF_ETH_HDR);
+    const struct etharp_hdr *arp =
+        (const struct etharp_hdr *)((const uint8_t *)frame->payload +
+                                    SIZEOF_ETH_HDR);
     forward = ddc_should_forward_arp_to_mesh(arp);
     goto out;
   }
@@ -1374,7 +1501,8 @@ static bool ddc_should_forward_to_mesh(struct pbuf *p) {
   if (ethertype == ETHTYPE_IP &&
       frame->tot_len >= (SIZEOF_ETH_HDR + IP_HLEN + UDP_HLEN)) {
     const struct ip_hdr *iph =
-        (const struct ip_hdr *)((const uint8_t *)frame->payload + SIZEOF_ETH_HDR);
+        (const struct ip_hdr *)((const uint8_t *)frame->payload +
+                                SIZEOF_ETH_HDR);
     uint16_t ihl = IPH_HL_BYTES(iph);
     if (ihl >= IP_HLEN && ihl <= IP_HLEN_MAX &&
         frame->tot_len >= (SIZEOF_ETH_HDR + ihl + UDP_HLEN) &&
@@ -1397,7 +1525,8 @@ out:
 }
 
 static err_t ddc_netif_linkoutput_hook(struct netif *netif, struct pbuf *p) {
-  if (netif == NULL || netif != s_ddc_netif || !s_initialized || s_is_top_node) {
+  if (netif == NULL || netif != s_ddc_netif || !s_initialized ||
+      s_is_top_node) {
     return ERR_IF;
   }
 

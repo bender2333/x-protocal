@@ -66,7 +66,7 @@ extern "C" {
  */
 
 /** AT 接收任务栈大小 */
-#define TPMESH_AT_RX_TASK_STACK 256
+#define TPMESH_AT_RX_TASK_STACK 512
 
 /** AT 接收任务优先级 */
 #define TPMESH_AT_RX_TASK_PRIO (configMAX_PRIORITIES - 2)
@@ -78,7 +78,7 @@ extern "C" {
 #define TPMESH_BRIDGE_TASK_PRIO (configMAX_PRIORITIES - 3)
 
 /** DDC 心跳任务栈大小 */
-#define TPMESH_DDC_HB_TASK_STACK 256
+#define TPMESH_DDC_HB_TASK_STACK 512
 
 /** DDC 心跳任务优先级 */
 #define TPMESH_DDC_HB_TASK_PRIO (tskIDLE_PRIORITY + 2)

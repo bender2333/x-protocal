@@ -72,6 +72,7 @@ int tpmesh_module_init_top(struct netif *eth_netif) {
   } else {
     IP4_ADDR(&config.ip_addr, 192, 168, 10, 1);
   }
+  // IP4_ADDR(&config.ip_addr, 192, 168, 10, 11);
 
   config.mesh_id = TPMESH_TOP_NODE_MESH_ID;
   config.cell_id = 0;
@@ -139,11 +140,11 @@ int tpmesh_module_init_ddc(void) {
     /* ============================================================ */
 
     /* 使用 ip4_addr_get_u32 宏提取 u32 格式的 IP */
-    ip4_addr_set_u32(&config.ip_addr,
-                     ip4_addr_get_u32(netif_ip4_addr(netif_default)));
+    IP4_ADDR(&config.ip_addr, 192, 168, 10, 11);
+    // ip4_addr_set_u32(&config.ip_addr,
+    //                  ip4_addr_get_u32(netif_ip4_addr(netif_default)));
 
-    tpmesh_debug_printf("LwIP IP Copied: %s\n",
-                        ip4addr_ntoa(netif_ip4_addr(netif_default)));
+    tpmesh_debug_printf("LwIP IP Copied: %s\n", ip4addr_ntoa(&config.ip_addr));
 
   } else {
     /* ============================================================ */
