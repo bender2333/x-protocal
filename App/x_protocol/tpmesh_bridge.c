@@ -1019,12 +1019,10 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
       uint8_t frag_hdr = data[1];
       uint8_t seq = frag_hdr & 0x7F;
       bool is_last = (frag_hdr & 0x80) != 0;
-      const char *rule_desc =
-          (rule != SCHC_RULE_NO_COMPRESS) ? " (compressed/control)" : "";
       tpmesh_debug_printf(
-          "TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X seq=%u%s%s\n",
+          "TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X seq=%u%s (compressed/control)\n",
           tag, role, dest_mesh_id, (unsigned)rule, (unsigned)seq,
-          is_last ? "L" : "", rule_desc);
+          is_last ? "L" : "");
     } else {
       tpmesh_debug_printf(
           "TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X\n", tag, role,
@@ -1468,6 +1466,10 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
 
   uint16_t dst_mesh_id =
       s_is_top_node ? s_top_config.mesh_id : s_ddc_config.mesh_id;
+  if (complete_len >= TPMESH_TUNNEL_HDR_LEN && (complete_data[0] & 0x80U)) {
+    /* Broadcast semantic is encoded in L2_HDR bit7 and must be preserved. */
+    dst_mesh_id = MESH_ADDR_BROADCAST;
+  }
 
   if (schc_decompress(complete_data, complete_len, s_rebuild_eth_frame,
                       (uint16_t)sizeof(s_rebuild_eth_frame), &eth_len,

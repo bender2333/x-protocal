@@ -274,11 +274,19 @@ int schc_decompress(const uint8_t *mesh_data, uint16_t mesh_len,
             if (node_table_get_ip_by_mesh(src_mesh_id, &src_ip) != 0) {
                 IP4_ADDR(&src_ip, 192, 168, 10, 100);
             }
-            if (node_table_get_ip_by_mesh(dst_mesh_id, &dst_ip) != 0) {
+            if (dst_mesh_id == MESH_ADDR_BROADCAST) {
+                IP4_ADDR(&dst_ip, 255, 255, 255, 255);
+            } else if (node_table_get_ip_by_mesh(dst_mesh_id, &dst_ip) != 0) {
                 IP4_ADDR(&dst_ip, 192, 168, 10, 1);
             }
-            write_be32(eth + 12, ip4_addr_get_u32(&src_ip));
-            write_be32(eth + 16, ip4_addr_get_u32(&dst_ip));
+            eth[12] = ip4_addr1(&src_ip);
+            eth[13] = ip4_addr2(&src_ip);
+            eth[14] = ip4_addr3(&src_ip);
+            eth[15] = ip4_addr4(&src_ip);
+            eth[16] = ip4_addr1(&dst_ip);
+            eth[17] = ip4_addr2(&dst_ip);
+            eth[18] = ip4_addr3(&dst_ip);
+            eth[19] = ip4_addr4(&dst_ip);
 
             uint16_t ip_cksum = schc_ip_checksum(eth, IP_HDR_LEN);
             write_be16(eth + 10, ip_cksum);
@@ -331,11 +339,19 @@ int schc_decompress(const uint8_t *mesh_data, uint16_t mesh_len,
             if (node_table_get_ip_by_mesh(src_mesh_id, &src_ip) != 0) {
                 IP4_ADDR(&src_ip, 192, 168, 10, 100);
             }
-            if (node_table_get_ip_by_mesh(dst_mesh_id, &dst_ip) != 0) {
+            if (dst_mesh_id == MESH_ADDR_BROADCAST) {
+                IP4_ADDR(&dst_ip, 255, 255, 255, 255);
+            } else if (node_table_get_ip_by_mesh(dst_mesh_id, &dst_ip) != 0) {
                 IP4_ADDR(&dst_ip, 192, 168, 10, 1);
             }
-            write_be32(eth + 12, ip4_addr_get_u32(&src_ip));
-            write_be32(eth + 16, ip4_addr_get_u32(&dst_ip));
+            eth[12] = ip4_addr1(&src_ip);
+            eth[13] = ip4_addr2(&src_ip);
+            eth[14] = ip4_addr3(&src_ip);
+            eth[15] = ip4_addr4(&src_ip);
+            eth[16] = ip4_addr1(&dst_ip);
+            eth[17] = ip4_addr2(&dst_ip);
+            eth[18] = ip4_addr3(&dst_ip);
+            eth[19] = ip4_addr4(&dst_ip);
 
             uint16_t ip_cksum = schc_ip_checksum(eth, IP_HDR_LEN);
             write_be16(eth + 10, ip_cksum);

@@ -264,9 +264,13 @@ HEX_DATA 内层（二进制隧道帧）
 - `RULE_ID=0x01` (`BACNET_IP`)：
   - `PAYLOAD=[SRC_MAC:6][UDP_PAYLOAD]`
   - IPv4/UDP 头在解压时重建。
+  - 当 `L2_HDR.bit7=1`（广播）时，重建 `DST_MAC=FF:FF:FF:FF:FF:FF`、`DST_IP=255.255.255.255`。
+  - 重建 `SRC_IP/DST_IP` 按网络字节序写入 IPv4 头。
 - `RULE_ID=0x02` (`IP_ONLY`)：
   - `PAYLOAD=[SRC_MAC:6][IP_PAYLOAD]`
   - 仅在满足规则时使用，否则回退 `NO_COMPRESS`。
+  - 当 `L2_HDR.bit7=1`（广播）时，重建 `DST_MAC=FF:FF:FF:FF:FF:FF`、`DST_IP=255.255.255.255`。
+  - 重建 `SRC_IP/DST_IP` 按网络字节序写入 IPv4 头。
 
 ### 6.7 Mesh 帧格式定义（字节级）
 
@@ -582,3 +586,5 @@ UART API（`tpmesh_uart.h`）：
 | V0.9.3 | 2026-02-12 | 补充广播业务帧样例解析（AT+SEND DEST=0x0000, RULE_ID=0x01） |
 | V0.9.4 | 2026-02-12 | 新增通用总体帧格式（AT外层 + HEX_DATA内层 + LEN规则） |
 | V0.9.5 | 2026-02-12 | 报文章节改为“总览框图 + 类型码总表 + 分类型小节”结构 |
+| V0.9.6 | 2026-02-12 | 修订广播重建语义：L2广播帧在解压端重建为广播 MAC + 255.255.255.255 |
+| V0.9.7 | 2026-02-12 | 修复解压重建 IPv4 地址字节序；统一控制帧单行日志格式 |
