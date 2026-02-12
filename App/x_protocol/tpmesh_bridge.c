@@ -1013,6 +1013,8 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
   const char *role = s_is_top_node ? "TOP" : "DDC";
   const char *state = s_is_top_node ? "-" : ddc_state_to_str(s_ddc_state);
   bool compact_control_rule = (rule == SCHC_RULE_REGISTER);
+  bool compact_top_ucast =
+      s_is_top_node && (strncmp(tag, "bridge_top_ucast:", 17) == 0);
 
   if (compact_control_rule) {
     if (data != NULL && len >= TPMESH_TUNNEL_HDR_LEN) {
@@ -1032,7 +1034,9 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
     tpmesh_debug_printf(
         "TPMesh AT+SEND [%s]: role=%s state=%s dst=0x%04X len=%u rule=0x%02X\n",
         tag, role, state, dest_mesh_id, (unsigned)len, (unsigned)rule);
-    trace_tunnel_packet_summary(tag, data, len);
+    if (!compact_top_ucast) {
+      trace_tunnel_packet_summary(tag, data, len);
+    }
   }
 
   int ret = tpmesh_at_send(dest_mesh_id, data, len);
@@ -1045,7 +1049,7 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
 static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
                                    uint16_t len) {
   if (frame == NULL || len < ETH_HDR_LEN) {
-    tpmesh_debug_printf("TPMesh DDC RX inject: invalid frame src=0x%04X len=%u\n",
+    tpmesh_debug_printf("TPMesh RX inject: invalid frame src=0x%04X len=%u\n",
                         src_mesh_id, (unsigned)len);
     return;
   }
@@ -1056,7 +1060,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   const char *l2 = schc_is_broadcast_mac(dst_mac) ? "broadcast" : "unicast";
 
   tpmesh_debug_printf(
-      "TPMesh DDC RX inject: src=0x%04X len=%u %s eth=0x%04X src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+      "TPMesh RX inject: src=0x%04X len=%u %s eth=0x%04X src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
       src_mesh_id, (unsigned)len, l2, (unsigned)ethertype, src_mac[0],
       src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5], dst_mac[0],
       dst_mac[1], dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
@@ -1064,7 +1068,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   if (ethertype == ETHTYPE_ARP) {
     if (len < (ETH_HDR_LEN + SIZEOF_ETHARP_HDR)) {
       tpmesh_debug_printf(
-          "TPMesh DDC RX inject: ARP short frame len=%u need=%u\n",
+          "TPMesh RX inject: ARP short frame len=%u need=%u\n",
           (unsigned)len, (unsigned)(ETH_HDR_LEN + SIZEOF_ETHARP_HDR));
       return;
     }
@@ -1074,7 +1078,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
     const ip4_addr_t *sip = (const ip4_addr_t *)&arp->sipaddr;
     const ip4_addr_t *dip = (const ip4_addr_t *)&arp->dipaddr;
     tpmesh_debug_printf(
-        "TPMesh DDC RX inject: ARP op=%u %u.%u.%u.%u -> %u.%u.%u.%u\n",
+        "TPMesh RX inject: ARP op=%u %u.%u.%u.%u -> %u.%u.%u.%u\n",
         (unsigned)lwip_ntohs(arp->opcode), ip4_addr1(sip), ip4_addr2(sip),
         ip4_addr3(sip), ip4_addr4(sip), ip4_addr1(dip), ip4_addr2(dip),
         ip4_addr3(dip), ip4_addr4(dip));
@@ -1086,7 +1090,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   }
 
   if (len < (ETH_HDR_LEN + IP_HLEN)) {
-    tpmesh_debug_printf("TPMesh DDC RX inject: IPv4 short frame len=%u\n",
+    tpmesh_debug_printf("TPMesh RX inject: IPv4 short frame len=%u\n",
                         (unsigned)len);
     return;
   }
@@ -1100,7 +1104,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   const uint8_t *dst_ip = ip + 16;
 
   tpmesh_debug_printf(
-      "TPMesh DDC RX inject: IPv4 ver=%u ihl=%u tot=%u proto=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
+      "TPMesh RX inject: IPv4 ver=%u ihl=%u tot=%u proto=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
       (unsigned)version, (unsigned)ihl, (unsigned)ip_tot_len, (unsigned)proto,
       src_ip[0], src_ip[1], src_ip[2], src_ip[3], dst_ip[0], dst_ip[1],
       dst_ip[2], dst_ip[3]);
@@ -1114,7 +1118,7 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   uint16_t sport = (uint16_t)(((uint16_t)udp[0] << 8) | udp[1]);
   uint16_t dport = (uint16_t)(((uint16_t)udp[2] << 8) | udp[3]);
   uint16_t ulen = (uint16_t)(((uint16_t)udp[4] << 8) | udp[5]);
-  tpmesh_debug_printf("TPMesh DDC RX inject: UDP sport=%u dport=%u len=%u\n",
+  tpmesh_debug_printf("TPMesh RX inject: UDP sport=%u dport=%u len=%u\n",
                       (unsigned)sport, (unsigned)dport, (unsigned)ulen);
 }
 
@@ -1459,6 +1463,19 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
   }
 
   /* 更新节点活跃时间 */
+  if (complete_len >= TPMESH_TUNNEL_HDR_LEN) {
+    const char *role = s_is_top_node ? "TOP" : "DDC";
+    uint8_t frag_hdr = complete_data[1];
+    uint8_t seq = frag_hdr & 0x7F;
+    bool is_last = (frag_hdr & 0x80) != 0;
+    uint8_t rule = complete_data[2];
+    const char *l2 = (complete_data[0] & 0x80U) ? "broadcast" : "unicast";
+    tpmesh_debug_printf(
+        "TPMesh RX [%s]: src=0x%04X mesh_len=%u rule=0x%02X seq=%u%s %s\n",
+        role, src_mesh_id, (unsigned)complete_len, (unsigned)rule,
+        (unsigned)seq, is_last ? "L" : "", l2);
+  }
+
   node_table_touch(src_mesh_id);
 
   /* SCHC 解压 */
@@ -1479,6 +1496,7 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
   }
 
   top_fix_bacnet_src_ip(src_mesh_id, s_rebuild_eth_frame, eth_len);
+  trace_ddc_inject_frame(src_mesh_id, s_rebuild_eth_frame, eth_len);
 
   if (s_is_top_node) {
     /* Top Node: 转发到以太网 */
@@ -1494,7 +1512,6 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     /* DDC: 交给本地协议栈处理 */
     struct netif *ddc_netif = netif_default;
     if (ddc_netif && ddc_netif->input) {
-      trace_ddc_inject_frame(src_mesh_id, s_rebuild_eth_frame, eth_len);
       struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
       if (p) {
         memcpy(p->payload, s_rebuild_eth_frame, eth_len);
