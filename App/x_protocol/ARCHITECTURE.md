@@ -195,7 +195,7 @@ HEX_DATA 内层（二进制隧道帧）
 | 类型码 | 名称 | 方向 | 说明 |
 |---|---|---|---|
 | `0x00` | `NO_COMPRESS` | 双向 | 不压缩透传，携带完整 L2/L3/L4 数据 |
-| `0x01` | `BACNET_IP` | 双向 | BACnet/IP 业务帧，压缩掉 IPv4/UDP 头 |
+| `0x01` | `BACNET_IP` | 双向 | 仅 `UDP src=47808 或 dst=47808` 时使用，压缩掉 IPv4/UDP 头 |
 | `0x02` | `IP_ONLY` | 双向 | 非 BACnet 的 UDP IPv4 业务帧，压缩 IPv4 头 |
 | `0x10` | `REGISTER` | 双向 | 注册/心跳控制类帧 |
 
@@ -263,11 +263,13 @@ HEX_DATA 内层（二进制隧道帧）
   - `PAYLOAD=[SRC_MAC:6][DST_MAC:6][ETHERTYPE+L3+L4+DATA]`
 - `RULE_ID=0x01` (`BACNET_IP`)：
   - `PAYLOAD=[SRC_MAC:6][UDP_PAYLOAD]`
+  - 仅用于 `UDP src=47808 且 dst=47808` 的 BACnet/IP 报文。
   - IPv4/UDP 头在解压时重建。
   - 当 `L2_HDR.bit7=1`（广播）时，重建 `DST_MAC=FF:FF:FF:FF:FF:FF`、`DST_IP=255.255.255.255`。
   - 重建 `SRC_IP/DST_IP` 按网络字节序写入 IPv4 头。
 - `RULE_ID=0x02` (`IP_ONLY`)：
   - `PAYLOAD=[SRC_MAC:6][IP_PAYLOAD]`
+  - 若 `UDP` 报文端口不是 `47808<->47808`，走该规则以保留原 UDP 头（含源/目的端口）。
   - 仅在满足规则时使用，否则回退 `NO_COMPRESS`。
   - 当 `L2_HDR.bit7=1`（广播）时，重建 `DST_MAC=FF:FF:FF:FF:FF:FF`、`DST_IP=255.255.255.255`。
   - 重建 `SRC_IP/DST_IP` 按网络字节序写入 IPv4 头。
@@ -588,3 +590,4 @@ UART API（`tpmesh_uart.h`）：
 | V0.9.5 | 2026-02-12 | 报文章节改为“总览框图 + 类型码总表 + 分类型小节”结构 |
 | V0.9.6 | 2026-02-12 | 修订广播重建语义：L2广播帧在解压端重建为广播 MAC + 255.255.255.255 |
 | V0.9.7 | 2026-02-12 | 修复解压重建 IPv4 地址字节序；统一控制帧单行日志格式 |
+| V0.9.8 | 2026-02-12 | SCHC 规则细化：仅 47808<->47808 使用 0x01，其他 UDP 走 0x02 保留端口 |
