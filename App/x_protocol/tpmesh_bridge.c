@@ -162,6 +162,7 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
 static uint16_t ip_checksum16(const uint8_t *buf, uint16_t len);
 static void top_fix_bacnet_src_ip(uint16_t src_mesh_id, uint8_t *eth_frame,
                                   uint16_t eth_len);
+static void ddc_fix_bacnet_dst_ip(uint8_t *eth_frame, uint16_t eth_len);
 
 /* ============================================================================
  * 公共函数 - 初始化
@@ -814,6 +815,80 @@ static void top_fix_bacnet_src_ip(uint16_t src_mesh_id, uint8_t *eth_frame,
   udp[7] = 0;
 }
 
+static void ddc_fix_bacnet_dst_ip(uint8_t *eth_frame, uint16_t eth_len) {
+  if (s_is_top_node || eth_frame == NULL ||
+      eth_len < (ETH_HDR_LEN + IP_HLEN + UDP_HLEN)) {
+    return;
+  }
+
+  struct netif *ddc_netif = netif_default;
+  if (ddc_netif == NULL) {
+    return;
+  }
+
+  const ip4_addr_t *local_ip = netif_ip4_addr(ddc_netif);
+  if (local_ip == NULL || ip4_addr_get_u32(local_ip) == 0U) {
+    return;
+  }
+
+  ip4_addr_t mesh_ip;
+  if (node_table_get_ip_by_mesh(s_ddc_config.mesh_id, &mesh_ip) != 0) {
+    return;
+  }
+  if (ip4_addr_get_u32(&mesh_ip) == 0U ||
+      ip4_addr_get_u32(&mesh_ip) == ip4_addr_get_u32(local_ip)) {
+    return;
+  }
+
+  uint16_t ethertype =
+      (uint16_t)(((uint16_t)eth_frame[12] << 8) | eth_frame[13]);
+  if (ethertype != ETHTYPE_IP) {
+    return;
+  }
+
+  uint8_t *ip = eth_frame + ETH_HDR_LEN;
+  uint8_t version = (uint8_t)((ip[0] >> 4) & 0x0F);
+  uint8_t ihl = (uint8_t)((ip[0] & 0x0F) * 4U);
+  if (version != 4 || ihl < IP_HLEN || ihl > IP_HLEN_MAX ||
+      eth_len < (ETH_HDR_LEN + ihl + UDP_HLEN) || ip[9] != IP_PROTO_UDP) {
+    return;
+  }
+
+  uint8_t *udp = ip + ihl;
+  uint16_t sport = (uint16_t)(((uint16_t)udp[0] << 8) | udp[1]);
+  uint16_t dport = (uint16_t)(((uint16_t)udp[2] << 8) | udp[3]);
+  if (sport != TPMESH_PORT_BACNET && dport != TPMESH_PORT_BACNET) {
+    return;
+  }
+
+  uint8_t mesh_dst[4] = {ip4_addr1(&mesh_ip), ip4_addr2(&mesh_ip),
+                         ip4_addr3(&mesh_ip), ip4_addr4(&mesh_ip)};
+  if (memcmp(ip + 16, mesh_dst, sizeof(mesh_dst)) != 0) {
+    return;
+  }
+
+  uint8_t local_dst[4] = {ip4_addr1(local_ip), ip4_addr2(local_ip),
+                          ip4_addr3(local_ip), ip4_addr4(local_ip)};
+  tpmesh_debug_printf(
+      "TPMesh DDC: fix downlink dst ip %u.%u.%u.%u -> %u.%u.%u.%u\n", ip[16],
+      ip[17], ip[18], ip[19], local_dst[0], local_dst[1], local_dst[2],
+      local_dst[3]);
+
+  memcpy(ip + 16, local_dst, sizeof(local_dst));
+  ip[10] = 0;
+  ip[11] = 0;
+  {
+    uint16_t cksum = ip_checksum16(ip, ihl);
+    ip[10] = (uint8_t)(cksum >> 8);
+    ip[11] = (uint8_t)(cksum & 0xFF);
+  }
+
+  /* IPv4 UDP allows checksum=0. Clear stale checksum after destination rewrite.
+   */
+  udp[6] = 0;
+  udp[7] = 0;
+}
+
 bool tpmesh_is_broadcast_mac(const uint8_t *mac) {
   return schc_is_broadcast_mac(mac);
 }
@@ -1021,10 +1096,10 @@ static int at_send_with_trace(const char *source, uint16_t dest_mesh_id,
       uint8_t frag_hdr = data[1];
       uint8_t seq = frag_hdr & 0x7F;
       bool is_last = (frag_hdr & 0x80) != 0;
-      tpmesh_debug_printf(
-          "TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X seq=%u%s (compressed/control)\n",
-          tag, role, dest_mesh_id, (unsigned)rule, (unsigned)seq,
-          is_last ? "L" : "");
+      tpmesh_debug_printf("TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X "
+                          "seq=%u%s (compressed/control)\n",
+                          tag, role, dest_mesh_id, (unsigned)rule,
+                          (unsigned)seq, is_last ? "L" : "");
     } else {
       tpmesh_debug_printf(
           "TPMesh AT+SEND [%s]: role=%s dst=0x%04X rule=0x%02X\n", tag, role,
@@ -1060,16 +1135,17 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   const char *l2 = schc_is_broadcast_mac(dst_mac) ? "broadcast" : "unicast";
 
   tpmesh_debug_printf(
-      "TPMesh RX inject: src=0x%04X len=%u %s eth=0x%04X src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+      "TPMesh RX inject: src=0x%04X len=%u %s eth=0x%04X "
+      "src=%02X:%02X:%02X:%02X:%02X:%02X dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
       src_mesh_id, (unsigned)len, l2, (unsigned)ethertype, src_mac[0],
       src_mac[1], src_mac[2], src_mac[3], src_mac[4], src_mac[5], dst_mac[0],
       dst_mac[1], dst_mac[2], dst_mac[3], dst_mac[4], dst_mac[5]);
 
   if (ethertype == ETHTYPE_ARP) {
     if (len < (ETH_HDR_LEN + SIZEOF_ETHARP_HDR)) {
-      tpmesh_debug_printf(
-          "TPMesh RX inject: ARP short frame len=%u need=%u\n",
-          (unsigned)len, (unsigned)(ETH_HDR_LEN + SIZEOF_ETHARP_HDR));
+      tpmesh_debug_printf("TPMesh RX inject: ARP short frame len=%u need=%u\n",
+                          (unsigned)len,
+                          (unsigned)(ETH_HDR_LEN + SIZEOF_ETHARP_HDR));
       return;
     }
 
@@ -1103,11 +1179,11 @@ static void trace_ddc_inject_frame(uint16_t src_mesh_id, const uint8_t *frame,
   const uint8_t *src_ip = ip + 12;
   const uint8_t *dst_ip = ip + 16;
 
-  tpmesh_debug_printf(
-      "TPMesh RX inject: IPv4 ver=%u ihl=%u tot=%u proto=%u src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
-      (unsigned)version, (unsigned)ihl, (unsigned)ip_tot_len, (unsigned)proto,
-      src_ip[0], src_ip[1], src_ip[2], src_ip[3], dst_ip[0], dst_ip[1],
-      dst_ip[2], dst_ip[3]);
+  tpmesh_debug_printf("TPMesh RX inject: IPv4 ver=%u ihl=%u tot=%u proto=%u "
+                      "src=%u.%u.%u.%u dst=%u.%u.%u.%u\n",
+                      (unsigned)version, (unsigned)ihl, (unsigned)ip_tot_len,
+                      (unsigned)proto, src_ip[0], src_ip[1], src_ip[2],
+                      src_ip[3], dst_ip[0], dst_ip[1], dst_ip[2], dst_ip[3]);
 
   if (version != 4 || ihl < IP_HLEN || proto != IP_PROTO_UDP ||
       len < (uint16_t)(ETH_HDR_LEN + ihl + UDP_HLEN)) {
@@ -1512,6 +1588,7 @@ static void process_data_frame(uint16_t src_mesh_id, const uint8_t *data,
     /* DDC: 交给本地协议栈处理 */
     struct netif *ddc_netif = netif_default;
     if (ddc_netif && ddc_netif->input) {
+      ddc_fix_bacnet_dst_ip(s_rebuild_eth_frame, eth_len);
       struct pbuf *p = pbuf_alloc(PBUF_RAW, eth_len, PBUF_RAM);
       if (p) {
         memcpy(p->payload, s_rebuild_eth_frame, eth_len);
@@ -1757,7 +1834,8 @@ static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
 
   if (tx_err != ERR_OK) {
     tpmesh_debug_printf(
-        "TPMesh: Proxy ARP reply send failed err=%d target=%d.%d.%d.%d requester=%d.%d.%d.%d dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+        "TPMesh: Proxy ARP reply send failed err=%d target=%d.%d.%d.%d "
+        "requester=%d.%d.%d.%d dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
         (int)tx_err, ip4_addr1(target_ip), ip4_addr2(target_ip),
         ip4_addr3(target_ip), ip4_addr4(target_ip), ip4_addr1(&req_ip),
         ip4_addr2(&req_ip), ip4_addr3(&req_ip), ip4_addr4(&req_ip),
@@ -1767,7 +1845,8 @@ static int send_proxy_arp_reply_internal(struct pbuf *arp_request,
   }
 
   tpmesh_debug_printf(
-      "TPMesh: Proxy ARP reply sent target=%d.%d.%d.%d requester=%d.%d.%d.%d dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
+      "TPMesh: Proxy ARP reply sent target=%d.%d.%d.%d requester=%d.%d.%d.%d "
+      "dst=%02X:%02X:%02X:%02X:%02X:%02X\n",
       ip4_addr1(target_ip), ip4_addr2(target_ip), ip4_addr3(target_ip),
       ip4_addr4(target_ip), ip4_addr1(&req_ip), ip4_addr2(&req_ip),
       ip4_addr3(&req_ip), ip4_addr4(&req_ip), req_eth->src.addr[0],
